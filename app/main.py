@@ -7,7 +7,7 @@ from fastapi import FastAPI
 
 from app import audit, config, db, scheduler
 from app.ai import draft_daily_message, propose_week_plan
-from app.api import auth, plan, profile, telegram_link
+from app.api import auth, plan, profile, sessions, telegram_link
 from app.bot.handlers import build_application
 from app.integrations import openweather
 from app.clock import SystemClock
@@ -87,6 +87,7 @@ def create_app(
     app.include_router(profile.router)
     app.include_router(telegram_link.router)
     app.include_router(plan.router)
+    app.include_router(sessions.router)
     return app
 
 
