@@ -137,13 +137,13 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Tests for User Story 1 ⚠️
 
-- [ ] T018 [P] [US1] Escribir `tests/unit/test_profile_rules.py`. Casos que se aceptan: cada campo en sus límites (frecuencia 1 y 7; distancia 1 y 42,2; ritmo 3:00 y 10:00; ciudad de 100 caracteres; rango de exactamente 60 min; envío un minuto antes del fin). Casos que se rechazan: frecuencia 0 y 8, distancia 0,99 y 42,21, ritmo 2:59, 10:01 y "6:60", ciudad vacía o de espacios y de 101 caracteres, nivel "experto", inicio ≥ fin, rango de 59 min, envío ≥ fin, `null` en un campo distinto de `current_pace`. También verificar que la validación combina el PUT parcial con el perfil guardado (R-20).
-- [ ] T019 [P] [US1] Escribir `tests/integration/test_auth_api.py`:
+- [X] T018 [P] [US1] Escribir `tests/unit/test_profile_rules.py`. Casos que se aceptan: cada campo en sus límites (frecuencia 1 y 7; distancia 1 y 42,2; ritmo 3:00 y 10:00; ciudad de 100 caracteres; rango de exactamente 60 min; envío un minuto antes del fin). Casos que se rechazan: frecuencia 0 y 8, distancia 0,99 y 42,21, ritmo 2:59, 10:01 y "6:60", ciudad vacía o de espacios y de 101 caracteres, nivel "experto", inicio ≥ fin, rango de 59 min, envío ≥ fin, `null` en un campo distinto de `current_pace`. También verificar que la validación combina el PUT parcial con el perfil guardado (R-20).
+- [X] T019 [P] [US1] Escribir `tests/integration/test_auth_api.py`:
   - Registro: 201, 409 con el mismo email en mayúsculas, 422 con email inválido y con contraseñas de 7 y 129 caracteres, sin crear filas (AC-01, AC-02, AC-72).
   - Login: 200 con `access_token` y `expires_at` a 2 h, y 401 con credenciales incorrectas (AC-03, AC-04).
   - Autenticación: un `GET /profile` sin token, con un token basura y con un token vencido (avanzando `FixedClock` 2 h 1 min) da 401 sin cuerpo de datos (AC-73).
   - Renovación: una request válida devuelve `X-Session-Token` con un `exp` nuevo. Si se renueva continuamente durante 7 días desde el login, la siguiente request da 401 (AC-05).
-- [ ] T020 [P] [US1] Escribir `tests/integration/test_profile_api.py`. Casos:
+- [X] T020 [P] [US1] Escribir `tests/integration/test_profile_api.py`. Casos:
   - Un `PUT /profile` completo da 200 y un `GET` posterior devuelve los mismos valores (AC-06, AC-51).
   - Un PUT parcial solo cambia los campos enviados.
   - Un PUT con un campo inválido entre varios válidos da 422 y `GET` muestra que no se guardó ninguno (AC-07).
@@ -152,18 +152,18 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Implementation for User Story 1
 
-- [ ] T021 [US1] Implementar `app/domain/profile_rules.py`:
+- [X] T021 [US1] Implementar `app/domain/profile_rules.py`:
   - `ProfileUpdate` (pydantic, todos los campos opcionales; ver `contracts/api.md`), con `model_config = ConfigDict(extra="forbid")` y validadores de formato (`level` es Literal, `preferred_range: {start, end}`).
   - `merge_and_validate(stored: dict, update: ProfileUpdate) -> dict`: devuelve el perfil combinado en unidades internas (`*_hm`, `*_s`, `*_min`) y lanza `ProfileValidationError(list[str])` ante reglas cruzadas o un `null` no permitido.
   - `to_public(profile: dict, linked: bool) -> dict`, con el formato `Profile` del contrato.
-- [ ] T022 [US1] Implementar `app/services/accounts.py` con `register(conn, email, password, now) -> int`, que lanza `EmailTakenError` si el email existe, y `login(conn, email, password, clock) -> (token, expires_at)`, que lanza `InvalidCredentialsError`. El login usa `auth_time = now`. Registrar `audit.event("tool_call", tool="db", op="register"|"login")` sin datos sensibles.
-- [ ] T023 [US1] Implementar `app/api/auth.py` (`APIRouter(prefix="/auth")`):
+- [X] T022 [US1] Implementar `app/services/accounts.py` con `register(conn, email, password, now) -> int`, que lanza `EmailTakenError` si el email existe, y `login(conn, email, password, clock) -> (token, expires_at)`, que lanza `InvalidCredentialsError`. El login usa `auth_time = now`. Registrar `audit.event("tool_call", tool="db", op="register"|"login")` sin datos sensibles.
+- [X] T023 [US1] Implementar `app/api/auth.py` (`APIRouter(prefix="/auth")`):
   - `POST /register` recibe un body con `email: EmailStr` y `password: str` de 8 a 128 caracteres (`Field(min_length=8, max_length=128)`). Responde 201 `{id, email}`, o 409 `{"detail": "El email ya está registrado"}`.
   - `POST /login` responde 200 `{access_token, token_type: "bearer", expires_at}`, o 401 `{"detail": "Credenciales inválidas"}`.
-- [ ] T024 [US1] Implementar `app/api/profile.py` (`APIRouter(prefix="/profile")`), donde todas las rutas dependen de `get_current_user`:
+- [X] T024 [US1] Implementar `app/api/profile.py` (`APIRouter(prefix="/profile")`), donde todas las rutas dependen de `get_current_user`:
   - `GET ""` devuelve `to_public`.
   - `PUT ""` valida con `merge_and_validate`, guarda con `update_profile` en una transacción, emite `audit.event("tool_call", tool="db", op="update_profile")` y responde 200. Si la validación falla, responde 422 con `detail` sin persistir nada.
-- [ ] T025 [US1] Registrar los routers `auth` y `profile` en `create_app` de `app/main.py`. Ejecutar `uv run pytest tests/unit/test_profile_rules.py tests/integration/test_auth_api.py tests/integration/test_profile_api.py` hasta que todo pase.
+- [X] T025 [US1] Registrar los routers `auth` y `profile` en `create_app` de `app/main.py`. Ejecutar `uv run pytest tests/unit/test_profile_rules.py tests/integration/test_auth_api.py tests/integration/test_profile_api.py` hasta que todo pase.
 
 **Checkpoint**: US1 funciona y se puede testear sola.
 

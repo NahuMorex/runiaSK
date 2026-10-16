@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import audit, config, db
+from app.api import auth, profile
 from app.clock import SystemClock
 
 
@@ -37,6 +38,9 @@ def create_app(
     app.state.weather = weather
     app.state.notifier = notifier
     app.state.start_background = start_background
+
+    app.include_router(auth.router)
+    app.include_router(profile.router)
     return app
 
 
