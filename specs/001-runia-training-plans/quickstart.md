@@ -49,6 +49,8 @@ Con `curl` o en `/docs`:
 1. `POST /auth/register` → **201**. Si se repite → **409**. Con una contraseña de 7 caracteres → **422**.
 2. `POST /auth/login` → **200** con `access_token`. Con una contraseña incorrecta → **401**.
 3. `PUT /profile` con un nivel `intermedio` sin ritmo, más frecuencia, distancia, ciudad, rango y hora de envío → **200**.
+   Elegir una `send_time` **posterior a la hora actual** (por ejemplo, dentro de unas horas): si ya pasó, la pregunta de
+   fatiga llega apenas se crea el plan en el punto 7 (FR-029) y el paso 5 no se puede probar ese día.
    Probar `send_time` ≥ fin del rango → **422**, y verificar con `GET /profile` que no cambió nada.
    Verificar también que cada respuesta autenticada trae el header `X-Session-Token`.
 4. `POST /plan` → **422** "No hay datos sobre tu ritmo cargados en tu perfil".
@@ -58,16 +60,21 @@ Con `curl` o en `/docs`:
 7. `POST /plan` → **201**. Comprobar en la respuesta: tantas sesiones como `min(frecuencia, días hasta el domingo)`
    (AC-57); ninguna sesión por encima de 5 km de trote ni de la distancia objetivo (AC-61, AC-67); como máximo una
    sesión `calidad`, con ritmos entre 5:40 y 6:00, `target_time` y `recovery_after` (AC-15, AC-21, AC-22).
-   Repetir `POST /plan` → **409**. Por Telegram **no** debe llegar nada (AC-56).
+   Repetir `POST /plan` → **409**. El plan **no** se envía por Telegram (AC-56). Si `send_time` ya pasó y hay sesión
+   hoy, en el minuto siguiente llega la pregunta de fatiga: es el flujo diario (FR-029), no el plan.
 8. Verificar en los logs los eventos `llm_call`, `guardrail` (si hubo recortes) y `plan_generation`, sin tokens ni contraseñas.
 
 ## 5. Mensaje diario (US4, US5)
 
 1. Con `PUT /profile`, poner `send_time` 2 minutos en el futuro (y dejar el rango posterior a esa hora), y tener una sesión hoy.
+   Hacerlo **antes** de que llegue la `send_time` anterior: el flujo diario corre una sola vez por día, y una vez que
+   arrancó, cambiar la hora o el rango no tiene efecto hasta el día siguiente. El clima se evalúa con el rango vigente
+   a la hora de envío.
 2. A la hora de envío, el bot pregunta la fatiga. Responder `abc` → vuelve a preguntar. Responder `9`.
 3. Resultado esperado: un mensaje de ≤ 150 palabras, sin markdown ni preguntas, con el tipo, el rango horario y, si
    corresponde, el ritmo o la secuencia, llegado en ≤ 10 s. Con fatiga 9 y una sesión de calidad, el mensaje dice `suave/recuperación`.
-4. Para probar la falla del clima, reiniciar con `OPENWEATHER_API_KEY=invalida` y repetir. El mensaje incluye
+4. Para probar la falla del clima hace falta **otro día con sesión**, porque el flujo diario de hoy ya corrió.
+   Ese día, antes de la hora de envío, reiniciar con `OPENWEATHER_API_KEY=invalida` y repetir. El mensaje incluye
    "Clima no disponible: seguí las pautas base de ritmo e hidratación." y en los logs aparece `external_error`.
 
 Los escenarios de alerta, alternativa, posposición, plantilla de respaldo y espera de 2 h están cubiertos por
