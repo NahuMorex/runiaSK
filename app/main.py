@@ -14,11 +14,23 @@ from app.clock import SystemClock
 from app.services.notifier import TelegramNotifier
 
 
+class BotStartupError(RuntimeError):
+    pass
+
+
 async def _start_bot(app: FastAPI, token: str):
     application = build_application(token, app.state)
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling()
+    try:
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling()
+    except Exception as exc:
+        # Los errores de python-telegram-bot (p. ej. InvalidToken) incluyen el token textual (SC-008):
+        # se descartan el mensaje y la causa encadenada, y solo se conserva el tipo.
+        audit.event("external_error", service="telegram", reason=type(exc).__name__)
+        with suppress(Exception):
+            await application.shutdown()
+        raise BotStartupError(f"No se pudo iniciar el bot de Telegram ({type(exc).__name__})") from None
     if app.state.notifier is None:
         app.state.notifier = TelegramNotifier(application.bot)
     audit.event("startup", bot=True)

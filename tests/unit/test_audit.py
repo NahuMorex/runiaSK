@@ -2,14 +2,16 @@
 
 import json
 import logging
+import traceback
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from telegram.error import InvalidToken
 
-from app import audit, scheduler
+from app import audit, main, scheduler
 from app.ai import gemini
 from app.ai.schemas import WeekPlanProposal
 from app.bot.handlers import build_application, handle_restablecer, handle_text, handle_vincular
@@ -80,6 +82,44 @@ def test_event_writes_redacted_json(caplog):
     record = json.loads(caplog.records[-1].getMessage())
     assert record["type"] == "tool_call" and record["password"] == audit.REDACTED
     assert "secreta" not in caplog.text
+
+
+class RejectingApplication:
+    """Aplicación de PTB cuyo initialize() falla como con un token rechazado por Telegram."""
+
+    def __init__(self, token: str):
+        self.token = token
+        self.shutdown_called = False
+
+    async def initialize(self):
+        try:
+            raise InvalidToken("Unauthorized: invalid token specified")
+        except InvalidToken as exc:
+            raise InvalidToken(f"The token `{self.token}` was rejected by the server.") from exc
+
+    async def shutdown(self):
+        self.shutdown_called = True
+
+
+def test_rejected_bot_token_does_not_leak_on_startup(db_path, monkeypatch, caplog):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", FAKE_BOT_TOKEN)
+    rejecting = RejectingApplication(FAKE_BOT_TOKEN)
+    monkeypatch.setattr(main, "build_application", lambda token, state: rejecting)
+    caplog.set_level(logging.DEBUG)
+
+    with pytest.raises(main.BotStartupError) as excinfo:
+        with TestClient(main.create_app(db_path=db_path, notifier=FakeNotifier(), weather=MockedOpenWeather())):
+            pass
+
+    rendered = "".join(traceback.format_exception(excinfo.value))
+    assert "InvalidToken" in rendered
+    assert FAKE_BOT_TOKEN not in rendered
+    assert FAKE_BOT_TOKEN not in caplog.text
+    assert rejecting.shutdown_called
+    assert any(
+        ev["type"] == "external_error" and ev["service"] == "telegram" and ev["reason"] == "InvalidToken"
+        for ev in _events(caplog)
+    )
 
 
 # --- Dobles: cliente de google-genai y transporte de OpenWeatherMap -----------
