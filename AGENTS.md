@@ -18,6 +18,8 @@ El plan lo genera un agente con Gemini, que ajusta la sesión diaria por clima (
 - Levantar API + bot: `uv run --env-file .env uvicorn app.main:app --reload` (la app no lee el `.env` sola; sin `TELEGRAM_BOT_TOKEN` levanta la API sin el bot)
 - Tests: `uv run pytest` (uno solo: `uv run pytest tests/test_x.py::test_y`)
 - Variables de entorno: `GOOGLE_API_KEY`, `TELEGRAM_BOT_TOKEN`, `OPENWEATHER_API_KEY`, `JWT_SECRET`, en un `.env` que no se commitea
+- `RUNIA_DB_PATH` (opcional, no es un secreto): ruta del archivo SQLite; por defecto `runia.db`
+- Comandos del bot: `/vincular <código>` (código de `POST /telegram/link-code`), `/registrar <completada|parcial|salteada> [rpe] [notas]` (sesión de hoy) y `/restablecer` (código para `POST /auth/password-reset`)
 
 ## Qué NO hacer
 - No inventar datos de perfil ni de plan si faltan métricas: rechazar la solicitud.
