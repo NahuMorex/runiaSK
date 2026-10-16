@@ -224,3 +224,18 @@ def serialize_plan(conn, plan_id: int, today: date, *, include_result: bool = Fa
             for s in repository.get_plan_sessions(conn, plan_id)
         ],
     }
+
+
+def serialize_history_item(row: dict, today: date) -> dict:
+    """`HistoryItem` de contracts/api.md."""
+    result = row["result"]
+    return {
+        "session_id": row["id"],
+        "date": row["date"].isoformat(),
+        "title": row["title"],
+        "type": session_type_label(row["blocks"]),
+        "run_km": units.hm_to_km(run_volume_hm(row["blocks"])),
+        "status": status_label(row, result, today),
+        "rpe": result["rpe"] if result else None,
+        "notes": result["notes"] if result else None,
+    }
