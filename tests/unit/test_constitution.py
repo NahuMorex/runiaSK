@@ -100,6 +100,12 @@ def test_plan_prompt_asks_for_explicit_warmup_and_cooldown_blocks():
     assert "bloques" in text and "explícitos" in text
 
 
+def test_plan_prompt_keeps_target_pace_out_of_easy_runs():
+    text = PLAN_SYSTEM_PROMPT.lower()
+    assert "cuenta como sesión de calidad" in text
+    assert "los rodajes suaves, la entrada en calor y la vuelta a la calma nunca llevan `target_pace_s`" in text
+
+
 def test_prompt_schemas_have_no_personal_identifiers():
     for model in (PlanRequest, DailyMessageData):
         fields = {f.lower() for f in model.model_fields}

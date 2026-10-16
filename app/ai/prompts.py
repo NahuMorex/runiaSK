@@ -17,6 +17,8 @@ Respondé solo con JSON que respete el esquema pedido. Reglas:
   mismo tipo) y ningún bloque lleva `target_pace_s`.
 - Un tramo con `target_pace_s` (segundos por km) solo puede aparecer si `quality_allowed` es verdadero, y como
   máximo en una sesión de la semana. Cada tramo con ritmo, salvo el último de la sesión, lleva `recovery_after_s`.
+- Una sesión con algún `target_pace_s` cuenta como sesión de calidad. El ritmo objetivo va solo en los tramos de esa
+  sesión de calidad: los rodajes suaves, la entrada en calor y la vuelta a la calma nunca llevan `target_pace_s`.
 - Usá `max_session_km` y `target_volume_km` como orientación para la distancia de cada sesión y de la semana.
 - Si `is_deload` es verdadero, la semana es de descarga: bajá la carga.
 - `title` es una etiqueta corta (hasta 40 caracteres, sin números), por ejemplo "Rodaje" o "Intervalos".
