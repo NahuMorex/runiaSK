@@ -49,31 +49,31 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 **⚠️ CRITICAL**: Ninguna historia puede empezar hasta terminar esta fase.
 
-- [ ] T004 [P] Implementar `app/config.py` con:
+- [X] T004 [P] Implementar `app/config.py` con:
   - `class MissingConfigError(RuntimeError)`.
   - `google_api_key()`, `openweather_api_key()` y `jwt_secret()`: leen `os.environ` y lanzan `MissingConfigError("<VAR> no está definida")` si la variable falta o está vacía.
   - `telegram_bot_token() -> str | None`: devuelve `None` si falta, porque la API arranca sin el bot.
   - `db_path() -> str`: lee `RUNIA_DB_PATH`, con valor por defecto `"runia.db"` (no es un secreto).
   - Ninguna credencial lleva valor por defecto.
-- [ ] T005 [P] Implementar `app/clock.py` con:
+- [X] T005 [P] Implementar `app/clock.py` con:
   - `TZ = ZoneInfo("America/Argentina/Buenos_Aires")`.
   - El protocolo `Clock` con `now() -> datetime` (aware, en TZ).
   - `SystemClock` y `FixedClock(dt)`, este último con un `advance(timedelta)` mutable.
   - El helper `today(clock) -> date`.
-- [ ] T006 [P] Implementar `app/audit.py` según R-18:
+- [X] T006 [P] Implementar `app/audit.py` según R-18:
   - Logger `runia.audit` con un handler a stdout que escribe una línea JSON por evento (`json.dumps(ensure_ascii=False, default=str)`).
   - `event(type: str, **fields)` agrega `ts` en ISO con TZ.
   - `redact(obj)` es recursivo: reemplaza por `"[redacted]"` los valores cuyas claves, en minúsculas, contengan `password`, `token`, `api_key`, `authorization`, `secret` o sean exactamente `code`.
   - `summarize(text, limit=500)` trunca los textos largos.
   - `configure_logging()`, llamado desde `create_app`: fija en `WARNING` los loggers `httpx`, `httpcore` y `telegram`, porque en INFO registran URLs con el token del bot y `appid=` (principio II, SC-008).
   - No importa nada de `app.services`, `app.db` ni `app.ai`.
-- [ ] T007 [P] Implementar `app/domain/units.py` (R-07):
+- [X] T007 [P] Implementar `app/domain/units.py` (R-07):
   - Distancias: `km_to_hm(km: float) -> int` (`round(km*100)`); `hm_to_km(hm) -> float`; `format_km(hm) -> str` con coma decimal y 2 decimales (`235 → "2,35"`).
   - Ritmo: `parse_pace(text) -> int` acepta `m:ss` y `mm:ss` con segundos de 00 a 59 y lanza `ValueError`; `format_pace(s) -> "m:ss"`.
   - Horarios: `parse_hhmm(text) -> int` en minutos, de 00:00 a 23:59; `format_hhmm(min)`.
   - Duraciones: `format_duration(s)` devuelve `m:ss`, o `h:mm:ss` desde 3600 s.
   - Escalas y redondeos: `scale_floor(hm: int, factor: Fraction) -> int` (`floor(hm*factor)`); `target_time_s(hm, pace_s) -> int` (`round_half_up(hm*pace_s/100)` con aritmética entera); `fast_pace_limit(pace_s) -> int` (`ceil(pace_s*944/1000)` con enteros, de modo que 360 → 340).
-- [ ] T008 [P] Implementar `app/domain/weeks.py` (R-11, FR-016):
+- [X] T008 [P] Implementar `app/domain/weeks.py` (R-11, FR-016):
   - `week_start(d) -> date` (lunes) y `week_end(d) -> date` (domingo).
   - `remaining_days(d) -> int`, que incluye el día `d` (lunes = 7, domingo = 1).
   - `sessions_required(frequency, start_date) -> int`: `frequency` si `start_date` es lunes y `min(frequency, remaining_days)` en otro caso.
@@ -81,28 +81,28 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - `is_closed(week_start, today) -> bool`, verdadero si el domingo de esa semana es anterior a `today`.
   - `previous_week_start(ws)`.
   - `WEEKDAY_NAMES_ES = ["lunes", …, "domingo"]` y `weekday_es(d)`.
-- [ ] T009 Implementar `app/db.py`:
+- [X] T009 Implementar `app/db.py`:
   - `connect(path) -> sqlite3.Connection`, con `check_same_thread=False`, `row_factory=sqlite3.Row`, `PRAGMA foreign_keys=ON` y `PRAGMA journal_mode=WAL` (este último salvo con `:memory:`).
   - `init_db(conn)`: `CREATE TABLE IF NOT EXISTS` de las 11 tablas de `data-model.md` (`users`, `profiles`, `telegram_links`, `one_time_codes`, `plans`, `sessions`, `blocks`, `session_results`, `pending_reclassifications`, `daily_dispatches`, `weekly_generation_runs`), con sus `UNIQUE`, `CHECK` de enums y rangos, `FOREIGN KEY … ON DELETE CASCADE` y `adopted_from_plan_id … ON DELETE SET NULL`.
   - `@contextmanager transaction(conn)`: `BEGIN IMMEDIATE`, y después commit o rollback.
-- [ ] T010 [P] Implementar `app/domain/models.py`:
+- [X] T010 [P] Implementar `app/domain/models.py`:
   - Dataclasses (`frozen` donde se pueda): `Block(kind: Literal["walk","run"], distance_hm: int, target_pace_s: int|None=None, target_time_s: int|None=None, recovery_after_s: int|None=None)`, `PlannedSession(date, title, blocks: list[Block], reclassified=False)`, `WeekSummary(week_start, has_plan, is_full, is_deload, planned_volume_hm, completed_count, has_partial_rpe7, profile_snapshot: dict|None)`, `GuardrailEvent(rule, scope, session_date, before, after)`, `GuardrailContext` (campos de data-model "Entidades de dominio sin tabla") y `WeatherAssessment(available, unfavorable, extreme, reasons: list[str], alternative_date: date|None, postpone: bool)`, y el modelo pydantic `DailyMessageData` con los campos de `contracts/ai-module.md` (vive acá porque `domain/` no puede importar `app.ai`).
   - Helpers: `run_volume_hm(blocks)`, `is_quality(blocks)` (algún `run` con `target_pace_s`), `session_type_label(blocks) -> "calidad"|"suave"` y `to_easy(blocks) -> list[Block]`. `to_easy` devuelve un único `Block("run", suma de run)`, sin ritmo, tiempo ni recuperación, y elimina la caminata (R-12). Constantes `EASY_TITLE = "Trote suave"` y `QUALITY_TITLE = "Calidad"` (R-05). Agregar `reclassify(blocks) -> list[Block]`: devuelve `to_easy(blocks)` si `is_quality(blocks)` y, si no, los mismos bloques sin cambios (FR-042).
-- [ ] T011 [P] Implementar `app/security.py`:
+- [X] T011 [P] Implementar `app/security.py`:
   - `PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1, type=Type.ID)`, con `hash_password` y `verify_password`. `verify_password` devuelve `False` ante `VerifyMismatchError` o `InvalidHashError`.
   - `create_token(user_id, auth_time: datetime, now: datetime) -> (token, expires_at)`: JWT HS256 con `sub=str(user_id)`, `iat`, `exp=now+2h` y `auth_time` en epoch, usando `config.jwt_secret()`.
   - `decode_token(token, now) -> (user_id, auth_time)`: lanza `InvalidToken` si la firma no valida, si expiró (verificar `exp` contra `now`, que es inyectable, con `options={"verify_exp": False}` más un chequeo manual) o si `now - auth_time >= 7 días`.
   - `generate_code(length) -> str` con `secrets.choice` sobre `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, y `hash_code(code) -> str` (SHA-256 hex del código en mayúsculas) (R-15, R-16).
-- [ ] T012 [P] Crear `app/ai/schemas.py` con los modelos pydantic de `contracts/ai-module.md` (`WeekSummaryIn`, `PlanRequest`, `BlockOut`, `SessionOut` y `WeekPlanProposal`; `DailyMessageData` se importa de `app.domain.models` y se reexporta), y `app/ai/errors.py` con `class AIUnavailableError(Exception)`, que tiene un atributo `reason` cuyo valor es `"timeout"`, `"rate_limit"`, `"server_error"`, `"invalid_response"`, `"invalid_structure"` o `"error"`. En `app/ai/__init__.py` reexportar esos nombres; las funciones se agregan en US3 y US4.
-- [ ] T013 Crear `app/services/repository.py` con el helper `now_iso(clock)` y las funciones base de usuario y perfil:
+- [X] T012 [P] Crear `app/ai/schemas.py` con los modelos pydantic de `contracts/ai-module.md` (`WeekSummaryIn`, `PlanRequest`, `BlockOut`, `SessionOut` y `WeekPlanProposal`; `DailyMessageData` se importa de `app.domain.models` y se reexporta), y `app/ai/errors.py` con `class AIUnavailableError(Exception)`, que tiene un atributo `reason` cuyo valor es `"timeout"`, `"rate_limit"`, `"server_error"`, `"invalid_response"`, `"invalid_structure"` o `"error"`. En `app/ai/__init__.py` reexportar esos nombres; las funciones se agregan en US3 y US4.
+- [X] T013 Crear `app/services/repository.py` con el helper `now_iso(clock)` y las funciones base de usuario y perfil:
   - `create_user(conn, email, password_hash, now) -> int`: inserta también una fila vacía en `profiles`.
   - `get_user_by_email(conn, email)`, con el email normalizado a minúsculas, y `get_user(conn, user_id)`.
   - `get_profile(conn, user_id) -> dict`, `update_profile(conn, user_id, fields: dict, now)`.
   - `get_chat_id(conn, user_id) -> int|None`.
-- [ ] T014 Implementar `app/services/notifier.py`:
+- [X] T014 Implementar `app/services/notifier.py`:
   - El protocolo `Notifier` con `async send_message(chat_id: int, text: str) -> bool`.
   - `TelegramNotifier(bot: telegram.Bot)`: envía sin `parse_mode`, devuelve `True` si Telegram confirma y `False` ante `TelegramError`. Registra `audit.event("message_sent", ok=…)` o `audit.event("external_error", service="telegram", reason=…)`.
-- [ ] T015 Implementar `app/deps.py` y `app/main.py`.
+- [X] T015 Implementar `app/deps.py` y `app/main.py`.
   - `app/deps.py`:
     - `get_conn(request)`: abre `db.connect(request.app.state.db_path)` por request con `yield` y la cierra al final.
     - `get_clock(request)`: devuelve `request.app.state.clock`.
@@ -112,7 +112,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
     - `create_app(*, db_path=None, clock=None, planner=None, writer=None, weather=None, notifier=None, start_background=True) -> FastAPI`. Guarda todo en `app.state` y, en `lifespan`, llama a `config.jwt_secret()` (si falta, `MissingConfigError` y la app no arranca), abre una conexión y ejecuta `init_db`.
     - `app = create_app()` a nivel de módulo.
     - Por ahora sin routers ni bot: se agregan en cada historia.
-- [ ] T016 Crear `tests/conftest.py`:
+- [X] T016 Crear `tests/conftest.py`:
   - Fixture `env` (autouse): `monkeypatch.setenv` con `JWT_SECRET`, `GOOGLE_API_KEY` y `OPENWEATHER_API_KEY` falsos, y `delenv("TELEGRAM_BOT_TOKEN")`.
   - Fixture `db_path`: un archivo en `tmp_path`. Fixture `conn`: `connect` más `init_db`.
   - Fixture `clock`: `FixedClock` en jueves 2026-10-15 10:00 BA.
@@ -123,7 +123,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
     - `FakeNotifier`: guarda `(chat_id, text)` y devuelve `True`.
   - Fixture `client`: `TestClient(create_app(db_path=…, clock=…, planner=…, writer=…, weather=…, notifier=…, start_background=False))`.
   - Helpers `register_and_login(client, email, password="clave-segura-1") -> headers` y `seed_profile(conn, user_id, **overrides)`, este último con un perfil intermedio completo y válido por defecto.
-- [ ] T017 [P] Escribir `tests/unit/test_units.py` (conversiones, `format_km`, `parse_pace` inválidos, `fast_pace_limit(360)==340`, `target_time_s`, `scale_floor` con `Fraction(5,8)`), `tests/unit/test_weeks.py` (`sessions_required` lunes/jueves/domingo, `is_closed`, `allowed_dates`) y `tests/unit/test_security.py` (parámetros Argon2id en el hash `$argon2id$v=19$m=19456,t=2,p=1`, token vencido a las 2 h, rechazo con `auth_time` de 7 días, `hash_code` estable, `MissingConfigError` sin `JWT_SECRET`). Ejecutar `uv run pytest tests/unit`.
+- [X] T017 [P] Escribir `tests/unit/test_units.py` (conversiones, `format_km`, `parse_pace` inválidos, `fast_pace_limit(360)==340`, `target_time_s`, `scale_floor` con `Fraction(5,8)`), `tests/unit/test_weeks.py` (`sessions_required` lunes/jueves/domingo, `is_closed`, `allowed_dates`) y `tests/unit/test_security.py` (parámetros Argon2id en el hash `$argon2id$v=19$m=19456,t=2,p=1`, token vencido a las 2 h, rechazo con `auth_time` de 7 días, `hash_code` estable, `MissingConfigError` sin `JWT_SECRET`). Ejecutar `uv run pytest tests/unit`.
 
 **Checkpoint**: la base está lista y `uv run pytest` pasa. Desde acá se pueden empezar las historias.
 
