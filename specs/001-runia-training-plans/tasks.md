@@ -177,7 +177,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T026 [P] [US2] Escribir `tests/integration/test_linking.py`. Los casos se testean llamando a `handle_vincular(conn, clock, chat_id, args)` de `app/bot/handlers.py`, sin PTB real:
+- [X] T026 [P] [US2] Escribir `tests/integration/test_linking.py`. Los casos se testean llamando a `handle_vincular(conn, clock, chat_id, args)` de `app/bot/handlers.py`, sin PTB real:
   - `POST /telegram/link-code` da 201 con un código de 8 caracteres.
   - `/vincular` con el código vincula el chat y el texto de respuesta coincide con el contrato.
   - Reusar el código se rechaza (AC-44).
@@ -189,20 +189,20 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Implementation for User Story 2
 
-- [ ] T027 [US2] Agregar a `app/services/repository.py`:
+- [X] T027 [US2] Agregar a `app/services/repository.py`:
   - `create_code(conn, user_id, purpose, code_hash, expires_at)`.
   - `consume_code(conn, purpose, code_hash, now) -> user_id|None`: `UPDATE one_time_codes SET used_at=? WHERE code_hash=? AND purpose=? AND used_at IS NULL AND expires_at > ? RETURNING user_id`.
   - `find_valid_code(conn, purpose, code_hash, now) -> user_id|None`, que lee sin consumir.
   - `get_user_by_chat(conn, chat_id)` y `create_link(conn, user_id, chat_id, now)`.
-- [ ] T028 [US2] Implementar `app/services/linking.py`:
+- [X] T028 [US2] Implementar `app/services/linking.py`:
   - `create_link_code(conn, user_id, clock) -> (code, expires_at)`: 8 caracteres, vence en 15 min y lanza `AlreadyLinkedError` si la cuenta ya tiene un chat. Emite `audit.event("tool_call", tool="db", op="create_link_code")` sin el código.
   - `link_chat(conn, chat_id, code, clock) -> Literal["linked","invalid","already_linked"]`: dentro de `transaction`, busca el código válido, verifica que ni el chat ni la cuenta estén vinculados y solo después consume el código y crea el vínculo.
   - Registrar `audit.event("tool_call", tool="db", op="link_chat", outcome=…)`.
-- [ ] T029 [US2] Implementar `app/api/telegram_link.py` con `POST /telegram/link-code`. Responde 201 con `{code, expires_at, instructions}` (el texto del contrato) o 409 con `{"detail": "Tu cuenta ya tiene un chat de Telegram vinculado"}`. Registrarlo en `app/main.py`.
-- [ ] T030 [US2] Implementar `app/bot/handlers.py`. Hay dos capas:
+- [X] T029 [US2] Implementar `app/api/telegram_link.py` con `POST /telegram/link-code`. Responde 201 con `{code, expires_at, instructions}` (el texto del contrato) o 409 con `{"detail": "Tu cuenta ya tiene un chat de Telegram vinculado"}`. Registrarlo en `app/main.py`.
+- [X] T030 [US2] Implementar `app/bot/handlers.py`. Hay dos capas:
   - **Funciones núcleo**, testeables: `async handle_start() -> str` y `async handle_vincular(conn, clock, chat_id, args) -> str`. Devuelven los textos exactos de `contracts/telegram-bot.md`; si falta el argumento, devuelven el texto de código inválido.
   - **Adaptadores PTB**: `build_application(token, app_state) -> telegram.ext.Application`, que registra `CommandHandler("start")` y `CommandHandler("vincular")`. Cada adaptador abre su propia conexión con `db.connect(app_state.db_path)` y responde con `update.message.reply_text(text)`. La aplicación se construye con `ApplicationBuilder().token(token).concurrent_updates(True).build()`, para que las respuestas de fatiga de varios usuarios se procesen en paralelo (SC-004); con WAL y el `timeout` por defecto de 5 s de `sqlite3` alcanza para 10 escrituras concurrentes.
-- [ ] T031 [US2] En el `lifespan` de `app/main.py`, si `start_background` es verdadero y `config.telegram_bot_token()` no es `None`:
+- [X] T031 [US2] En el `lifespan` de `app/main.py`, si `start_background` es verdadero y `config.telegram_bot_token()` no es `None`:
   - Al arrancar: `application = build_application(...)`, después `await application.initialize()`, `await application.start()` y `await application.updater.start_polling()`, y guardar `app.state.notifier = TelegramNotifier(application.bot)`, salvo que se haya inyectado otro notifier.
   - Al apagar: `updater.stop()`, `stop()` y `shutdown()`.
   - Si no hay token, registrar `audit.event("startup", bot=False)`.
