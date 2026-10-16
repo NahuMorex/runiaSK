@@ -196,3 +196,50 @@ def seed_link(conn, user_id: int, chat_id: int, now: datetime | None = None) -> 
 
 def monday_of(d: date) -> date:
     return d - timedelta(days=d.weekday())
+
+
+def seed_plan(
+    conn,
+    user_id: int,
+    week_start: date,
+    sessions,
+    *,
+    start_date: date | None = None,
+    is_deload: bool = False,
+    is_post_deload: bool = False,
+    source: str = "monday",
+    profile: dict | None = None,
+) -> int:
+    """Guarda un plan ya armado (lista de PlannedSession) con save_plan."""
+    from app.domain import guardrails
+    from app.domain.summaries import profile_snapshot
+    from app.services import repository
+
+    start_date = start_date or week_start
+    profile = profile or repository.get_profile(conn, user_id)
+    return repository.save_plan(
+        conn,
+        user_id,
+        week_start=week_start,
+        start_date=start_date,
+        is_full=start_date == week_start,
+        is_deload=is_deload,
+        is_post_deload=is_post_deload,
+        source=source,
+        adopted_from_plan_id=None,
+        planned_volume_hm=guardrails.planned_volume_hm(sessions),
+        profile_snapshot=profile_snapshot(profile),
+        sessions=sessions,
+        now=ba(week_start.year, week_start.month, week_start.day),
+    )
+
+
+def seed_result(conn, session_id: int, user_id: int, status: str = "completed", rpe: int | None = 5, notes=None) -> None:
+    conn.execute(
+        "INSERT INTO session_results (session_id, user_id, status, rpe, notes, recorded_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (session_id, user_id, status, rpe, notes, ba(2026, 10, 1).isoformat()),
+    )
+
+
+def session_ids(conn, plan_id: int) -> list[int]:
+    return [r["id"] for r in conn.execute("SELECT id FROM sessions WHERE plan_id = ? ORDER BY date", (plan_id,))]

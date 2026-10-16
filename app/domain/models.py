@@ -50,6 +50,7 @@ class GuardrailEvent:
     session_date: date | None
     before: object
     after: object
+    reason: str | None = None  # regla concreta de un tope: initial_cap, target_distance, ten_percent, …
 
 
 @dataclass

@@ -220,19 +220,19 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T032 [P] [US3] Escribir `tests/unit/test_structure.py`, con un caso por regla de R-05 que valide la propuesta:
+- [X] T032 [P] [US3] Escribir `tests/unit/test_structure.py`, con un caso por regla de R-05 que valide la propuesta:
   - Rechazos generales: cantidad distinta de `sessions_required`, una fecha repetida, una fecha antes de `start_date` o después del domingo, una sesión sin `run`, un bloque con km 0 o negativo, un ritmo fuera de 60..1200 s y una recuperación negativa.
   - Primera semana de un novato: se rechaza si no alterna walk/run y se acepta si alterna `walk,run,walk,run`. Se rechaza si alterna pero algún `run` tiene `target_pace_s` (regla (c)).
   - Título: vacío, de 41 caracteres o con dígitos se reemplaza por `"Calidad"` o `"Trote suave"` según el tipo; uno válido se conserva.
   - Calidad con 2 tramos: se rechaza si el primero no tiene `recovery_after_s` y se acepta si el último no la tiene.
-- [ ] T033 [P] [US3] Escribir `tests/unit/test_summaries.py`, construyendo filas en memoria:
+- [X] T033 [P] [US3] Escribir `tests/unit/test_summaries.py`, construyendo filas en memoria:
   - Racha: 4 semanas con una Completada dan descarga; una semana sin plan corta la racha; una semana sin Completadas la vuelve a 0 (AC-19b); el conteo reinicia después de una descarga (AC-19c); una primera semana parcial con una Completada cuenta.
   - Calidad de novatos: elegible solo con ritmo y 3 semanas cerradas que cumplen; no elegible con menos de 3 semanas, con una semana sin Completada o con una Parcial de RPE ≥ 7 (AC-20).
   - Contexto: sin semana anterior da topes iniciales (AC-61); una anterior parcial sin semanas completas previas da topes iniciales (AC-62); una anterior parcial con una completa previa da base = última completa (AC-74); una anterior sin Completadas da `no_increase_hm` (AC-63).
   - Piso de AC-66: solo aplica si el snapshot del perfil es igual al actual, la semana anterior fue completa, tuvo al menos una Completada y no fue de descarga.
   - Semana posterior a la descarga: target = V4; si la descarga no tuvo ninguna Completada, target = None y `no_increase` = V5 (AC-19d).
   - AC-42: una sesión pospuesta por clima en la semana anterior no descuenta la base del 10% (se usa el `planned_volume_hm` completo) y su volumen no se suma a la semana actual.
-- [ ] T034 [P] [US3] Escribir `tests/unit/test_guardrails.py`, un test por regla, que además verifica que se emite un `GuardrailEvent` con `before` y `after`:
+- [X] T034 [P] [US3] Escribir `tests/unit/test_guardrails.py`, un test por regla, que además verifica que se emite un `GuardrailEvent` con `before` y `after`:
   - Topes iniciales de 2, 5 y 10 km por sesión y × frecuencia semanal (AC-61).
   - Tope del 10% sin piso que lo supere (AC-18).
   - Caso de AC-76: sesión de 8 km con tope de 5, factor 5/8 y después factor semanal sobre el volumen ya recortado; la caminata, las recuperaciones y el ritmo no cambian; `target_time_s` se recalcula.
@@ -245,7 +245,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - Pisos que no se aplican a planes parciales (R-10).
   - Reclasificación pendiente de 2: convierte las dos primeras sesiones si son de calidad y deja intactas las suaves (incluida la caminata de un novato), marcando ambas como reclasificadas. Las de calidad convertidas quedan con `title = "Trote suave"`.
   - Bloque que queda en 0 km sin eliminarse (R-07).
-- [ ] T035 [P] [US3] Escribir `tests/integration/test_plan_api.py`, usando `seed_profile` y un vínculo insertado directamente:
+- [X] T035 [P] [US3] Escribir `tests/integration/test_plan_api.py`, usando `seed_profile` y un vínculo insertado directamente:
   - Mensajes 422 de AC-08, AC-09 (un caso por campo, con el texto exacto `{campo}`) y AC-11.
   - Un novato sin ritmo genera el plan (AC-10).
   - Un 201 con un plan parcial de jueves tiene `min(freq, 4)` sesiones (AC-56, AC-57), y `FakeNotifier` no recibe nada.
@@ -255,7 +255,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - Una sesión de calidad intermedia trae `target_time` y `recovery_after` (AC-15).
   - Un plan completo en lunes tiene N sesiones en días distintos (AC-65).
   - El `PlanRequest` recibido por `FakePlanner` solo contiene `WeekSummaryIn` y ningún email ni chat_id (FR-028).
-- [ ] T036 [P] [US3] Escribir `tests/integration/test_weekly_job.py`, llamando a `scheduler.tick(app_state, now)` con `now` = lunes 2026-10-19 00:01:
+- [X] T036 [P] [US3] Escribir `tests/integration/test_weekly_job.py`, llamando a `scheduler.tick(app_state, now)` con `now` = lunes 2026-10-19 00:01:
   - Un usuario elegible recibe un plan completo y `FakeNotifier` recibe el resumen con día, tipo y km (AC-59).
   - Un usuario sin vínculo o con el perfil incompleto no recibe ningún plan (AC-60).
   - Un segundo tick no duplica nada.
@@ -264,7 +264,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - Con una reclasificación pendiente de 1 y un `FakePlanner` que falla, el plan adoptado tiene la primera sesión reclasificada a suave, `get_pending_reclass` queda en 0 y el plan del lunes siguiente no reclasifica nada (FR-042).
   - Si el último plan válido fue parcial (jueves a domingo, 3 sesiones), el plan adoptado tiene `start_date` el lunes, `is_full=1`, sesiones el jueves, el viernes y el domingo de la semana actual, y se le aplican los pisos (R-13).
   - Si `FakePlanner` lanza `RuntimeError` para un usuario, los demás reciben su plan, la corrida del primero queda con `outcome="error"` y un tick posterior no lo reintenta.
-- [ ] T088 [P] [US3] Verificador independiente de SC-001 (lista cerrada de la spec):
+- [X] T088 [P] [US3] Verificador independiente de SC-001 (lista cerrada de la spec):
   - Crear `tests/sc001_check.py` con `check_sc001(sessions: list[PlannedSession], ctx: GuardrailContext) -> list[str]`, que devuelve una violación por regla incumplida. Se reimplementa desde la spec y **no** importa `app.domain.guardrails` (puede usar `app.domain.models` y `app.domain.units`). Los tests lo importan con `from tests.sc001_check import check_sc001` (`pythonpath = ["."]`). Reglas:
     - Por sesión: km de trote ≤ `min` entre el tope inicial por nivel (si `ctx.initial_caps`) y `target_distance_hm` (FR-018, FR-025).
     - Semanal: volumen ≤ `min` entre `tope_inicial×frequency`, `floor(base_10_hm×11/10)` (salvo `is_post_deload`), `no_increase_hm`, `floor(deload_v4_hm×8/10)` y `post_deload_target_hm` (FR-018 a FR-021).
@@ -277,15 +277,15 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Implementation for User Story 3
 
-- [ ] T037 [US3] Agregar a `app/domain/profile_rules.py` la función `missing_field_message(profile: dict, linked: bool) -> str | None`, con el orden de `data-model.md` (nivel → frecuencia → distancia objetivo → ritmo, solo si el nivel no es novato → ciudad → rango horario → hora de envío → Telegram). Devuelve los textos exactos: `"No hay datos sobre tu ritmo cargados en tu perfil"`, `"No hay datos sobre tu {campo} cargados en tu perfil"` y `"Tu cuenta no tiene un chat de Telegram vinculado"`.
-- [ ] T038 [P] [US3] Implementar `app/domain/structure.py` con `validate_proposal(proposal: WeekPlanProposal, *, start_date, sessions_required, first_week_novice) -> list[PlannedSession]`. Lanza `InvalidProposalError(reason)` según R-05, incluida la regla (c) (un tramo con ritmo en la primera semana de un novato), normaliza `title` según R-05 y, si la propuesta es válida, la convierte a `PlannedSession` con `Block` en centésimas (`km_to_hm`), sin `target_time_s` (lo calcula el pipeline). `app/domain/` no puede importar `app.ai`: recibir la propuesta como un objeto con atributos `sessions[].date/title/blocks[].kind/distance_km/target_pace_s/recovery_after_s` (duck typing) o como `dict`.
-- [ ] T039 [P] [US3] Implementar `app/domain/summaries.py` (R-11):
+- [X] T037 [US3] Agregar a `app/domain/profile_rules.py` la función `missing_field_message(profile: dict, linked: bool) -> str | None`, con el orden de `data-model.md` (nivel → frecuencia → distancia objetivo → ritmo, solo si el nivel no es novato → ciudad → rango horario → hora de envío → Telegram). Devuelve los textos exactos: `"No hay datos sobre tu ritmo cargados en tu perfil"`, `"No hay datos sobre tu {campo} cargados en tu perfil"` y `"Tu cuenta no tiene un chat de Telegram vinculado"`.
+- [X] T038 [P] [US3] Implementar `app/domain/structure.py` con `validate_proposal(proposal: WeekPlanProposal, *, start_date, sessions_required, first_week_novice) -> list[PlannedSession]`. Lanza `InvalidProposalError(reason)` según R-05, incluida la regla (c) (un tramo con ritmo en la primera semana de un novato), normaliza `title` según R-05 y, si la propuesta es válida, la convierte a `PlannedSession` con `Block` en centésimas (`km_to_hm`), sin `target_time_s` (lo calcula el pipeline). `app/domain/` no puede importar `app.ai`: recibir la propuesta como un objeto con atributos `sessions[].date/title/blocks[].kind/distance_km/target_pace_s/recovery_after_s` (duck typing) o como `dict`.
+- [X] T039 [P] [US3] Implementar `app/domain/summaries.py` (R-11):
   - `summarize_weeks(plans_rows, sessions_rows, results_rows) -> dict[date, WeekSummary]`.
   - `deload_streak(summaries, current_week_start) -> int`.
   - `novice_quality_allowed(level, current_pace_s, summaries, current_week_start) -> bool`.
   - `build_context(profile, summaries, current_week_start, start_date, pending_reclass) -> GuardrailContext`. Calcula `initial_caps`, `base_10_hm`, `no_increase_hm`, `is_deload` y `deload_v4_hm` (si la racha es 4), `is_post_deload` (si el plan de la semana anterior tiene `is_deload=1`, haya tenido Completadas o no), `post_deload_target_hm` (si la semana anterior fue de descarga y tuvo alguna Completada; si no tuvo, `no_increase_hm = V5`) y `floor_prev_hm` (AC-66: semana anterior completa, con alguna Completada, no de descarga y snapshot igual al perfil actual; no aplica si la semana actual es de descarga).
   - `recent_summaries_for_ai(summaries, n=4) -> list[WeekSummary]`.
-- [ ] T040 [US3] Implementar en `app/domain/guardrails.py` la función `apply(sessions: list[PlannedSession], ctx: GuardrailContext) -> (list[PlannedSession], list[GuardrailEvent])` con los pasos 1 a 4 de R-06:
+- [X] T040 [US3] Implementar en `app/domain/guardrails.py` la función `apply(sessions: list[PlannedSession], ctx: GuardrailContext) -> (list[PlannedSession], list[GuardrailEvent])` con los pasos 1 a 4 de R-06:
   - Paso 1, reclasificación pendiente: aplica `reclassify` a las primeras `ctx.pending_reclass` sesiones por fecha (solo convierte las de calidad) y marca `reclassified=True` en todas ellas.
   - Paso 2, calidad de novatos (FR-022): convierte todas las de calidad si `level == "novato"` y no `novice_quality_allowed`.
   - Paso 3, máximo una de calidad (FR-023): conserva la primera por fecha.
@@ -293,30 +293,30 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - Toda sesión de calidad convertida en los pasos 1 a 3 queda con `title = EASY_TITLE`.
   - Al final, recalcula `target_time_s` de todo tramo con ritmo.
   - Emite eventos `reclassification_pending`, `novice_quality`, `max_one_quality` y `pace_clamp`.
-- [ ] T041 [US3] Completar en `app/domain/guardrails.py` los pasos 5 y 6 de R-06:
+- [X] T041 [US3] Completar en `app/domain/guardrails.py` los pasos 5 y 6 de R-06:
   - **Topes por sesión**: el tope efectivo es `min` entre el tope inicial por nivel (200, 500 o 1000 hm si `ctx.initial_caps`) y `target_distance_hm`. Si `run_volume > tope`, el factor es `Fraction(tope, run_volume)` y se aplica `scale_floor` solo a los bloques `run`.
   - **Topes semanales**: el tope efectivo es `min` entre `tope_inicial×frequency`, `floor(base_10_hm×11/10)`, `no_increase_hm`, `floor(deload_v4_hm×8/10)` y `post_deload_target_hm`. El 10% se omite si `ctx.is_post_deload`. El factor `Fraction(tope, volumen)` se calcula sobre el volumen ya recortado.
   - Recalcular `target_time_s` después de cada escala.
   - Emitir los eventos `session_cap` (`rule`: `initial_cap` o `target_distance`) y `weekly_cap` (`rule`: `initial_weekly`, `ten_percent`, `no_increase`, `deload` o `post_deload`).
-- [ ] T042 [US3] Completar en `app/domain/guardrails.py` el paso 7 de R-06, los pisos, que solo se aplican si `ctx.is_full`:
+- [X] T042 [US3] Completar en `app/domain/guardrails.py` el paso 7 de R-06, los pisos, que solo se aplican si `ctx.is_full`:
   - El piso es el `max` entre `floor_prev_hm`, `ceil(deload_v4_hm×7/10)` y `post_deload_target_hm`.
   - Si `volumen < piso − n_bloques_run` (la tolerancia), el factor es `min(Fraction(piso, vol), min_s Fraction(tope_s, run_s), Fraction(tope_semanal, vol))`, y se aplica `scale_floor` a los bloques `run` solo si el factor es mayor que 1.
   - Emitir el evento `floor_scale`.
   - Agregar `planned_volume_hm(sessions)`.
-- [ ] T043 [P] [US3] Implementar `app/ai/prompts.py` con `PLAN_SYSTEM_PROMPT` (en español, con las reglas de `contracts/ai-module.md` para el plan, incluida la de que la entrada en calor y la vuelta a la calma, si se proponen, vengan como bloques explícitos `run` o `walk`, sin km implícitos (FR-019), y la prohibición de consejo médico o de lesiones) y `build_plan_prompt(req: PlanRequest) -> str`, que serializa `req.model_dump_json()` con instrucciones. No debe incluir ningún email ni chat_id.
-- [ ] T044 [US3] Implementar en `app/ai/gemini.py`, el único archivo que importa `from google import genai` y `from google.genai import types`:
+- [X] T043 [P] [US3] Implementar `app/ai/prompts.py` con `PLAN_SYSTEM_PROMPT` (en español, con las reglas de `contracts/ai-module.md` para el plan, incluida la de que la entrada en calor y la vuelta a la calma, si se proponen, vengan como bloques explícitos `run` o `walk`, sin km implícitos (FR-019), y la prohibición de consejo médico o de lesiones) y `build_plan_prompt(req: PlanRequest) -> str`, que serializa `req.model_dump_json()` con instrucciones. No debe incluir ningún email ni chat_id.
+- [X] T044 [US3] Implementar en `app/ai/gemini.py`, el único archivo que importa `from google import genai` y `from google.genai import types`:
   - `_client()`: perezoso, con `genai.Client(api_key=config.google_api_key())`.
   - `async propose_week_plan(req) -> WeekPlanProposal`: llama a `asyncio.wait_for(client.aio.models.generate_content(model="gemini-3.5-flash-lite", contents=build_plan_prompt(req), config=types.GenerateContentConfig(system_instruction=PLAN_SYSTEM_PROMPT, response_mime_type="application/json", response_schema=WeekPlanProposal)), 20)` y parsea el resultado con `WeekPlanProposal.model_validate_json(resp.text)`.
   - Mapear `asyncio.TimeoutError` a `"timeout"`, un `errors.APIError` con code 429 a `"rate_limit"`, uno con code ≥ 500 a `"server_error"` y `ValidationError`/`ValueError` o un texto vacío a `"invalid_response"`, siempre lanzando `AIUnavailableError(reason)`.
   - Emitir `audit.event("llm_call", operation="plan", prompt_summary=…, response_summary=…, duration_ms=…, outcome=…)`.
   - Exportar `propose_week_plan` en `app/ai/__init__.py`.
-- [ ] T045 [US3] Agregar a `app/services/repository.py`:
+- [X] T045 [US3] Agregar a `app/services/repository.py`:
   - `get_plan_for_week(conn, user_id, week_start)` y `get_last_plan(conn, user_id)` (el de `week_start` más reciente, con sesiones y bloques).
   - `save_plan(conn, user_id, *, week_start, start_date, is_full, is_deload, is_post_deload, source, adopted_from_plan_id, planned_volume_hm, profile_snapshot, sessions: list[PlannedSession], now) -> int`, que inserta `plans`, `sessions` (con `user_id`) y `blocks` con su `position`.
   - `history_rows_for_summaries(conn, user_id, before_week_start)`, que devuelve los planes, las sesiones y los resultados de semanas anteriores.
   - `get_pending_reclass(conn, user_id) -> int` y `consume_pending_reclass(conn, user_id)`.
   - `eligible_users_for_monday(conn)` (usuarios con un vínculo) y `record_weekly_run(conn, user_id, week_start, outcome, now) -> bool`, que devuelve `False` si ya existe.
-- [ ] T046 [US3] Implementar `app/services/plan_service.py`:
+- [X] T046 [US3] Implementar `app/services/plan_service.py`:
   - `async build_and_save_plan(conn, user_id, clock, planner, *, source) -> plan_id`:
     1. Lee el perfil y el vínculo, y valida con `missing_field_message`; si falta algo, lanza `IncompleteProfileError(msg)`.
     2. Calcula `ws` y `start_date` (hoy) y lanza `PlanExistsError` si ya existe un plan para la semana.
@@ -328,8 +328,8 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - `async adopt_last_valid_plan(conn, user_id, clock) -> plan_id | None` (R-13): mapea por día de la semana las sesiones del último plan a la semana actual y aplica `guardrails.apply` con el contexto actual, armado con `build_context(..., start_date=ws, ...)`. Dentro de una misma `transaction` guarda con `source="fallback"`, `adopted_from_plan_id`, `start_date=ws`, `is_full=True` e `is_deload`/`is_post_deload` tomados de `ctx`, consume la reclasificación pendiente con `consume_pending_reclass` (igual que `build_and_save_plan`) y emite `audit.event("tool_call", tool="db", op="adopt_plan")`.
   - `serialize_plan(conn, plan_id, today) -> dict`, con la forma `Plan` del contrato (`type`, `run_km`, `blocks` con `kind` "trote"/"caminata", `target_pace`, `target_time`, `recovery_after` y `status` calculado con `status_label`).
   - `status_label(session_row, result_row, today) -> str` (R-19).
-- [ ] T047 [US3] Implementar `app/api/plan.py` con `POST /plan`, que depende de `get_current_user` y `planner`. Llama a `build_and_save_plan(source="on_demand")` y mapea las excepciones: `IncompleteProfileError` a 422 con `detail` igual al mensaje, `PlanExistsError` a 409 con "Ya tenés un plan para la semana en curso" y `AIUnavailableError` a 503 con "No es posible generar un plan en este momento.". Si todo sale bien, responde 201 con `serialize_plan`. No llama al notifier. Registrar el router en `app/main.py` e inyectar el `planner` por defecto (`app.ai.propose_week_plan`) en `create_app`. Si se usa el planner por defecto, el `lifespan` llama a `config.google_api_key()` al arrancar (principio II).
-- [ ] T048 [US3] Implementar `app/services/weekly_job.py`:
+- [X] T047 [US3] Implementar `app/api/plan.py` con `POST /plan`, que depende de `get_current_user` y `planner`. Llama a `build_and_save_plan(source="on_demand")` y mapea las excepciones: `IncompleteProfileError` a 422 con `detail` igual al mensaje, `PlanExistsError` a 409 con "Ya tenés un plan para la semana en curso" y `AIUnavailableError` a 503 con "No es posible generar un plan en este momento.". Si todo sale bien, responde 201 con `serialize_plan`. No llama al notifier. Registrar el router en `app/main.py` e inyectar el `planner` por defecto (`app.ai.propose_week_plan`) en `create_app`. Si se usa el planner por defecto, el `lifespan` llama a `config.google_api_key()` al arrancar (principio II).
+- [X] T048 [US3] Implementar `app/services/weekly_job.py`:
   - `async run_monday(conn, clock, planner, notifier)`: corre si `today` es lunes. Para cada usuario de `eligible_users_for_monday` sin una corrida registrada para la semana:
     1. Si el perfil está incompleto, `outcome="skipped_incomplete"` sin generar nada (AC-60).
     2. Si ya tiene plan, `outcome="skipped_existing"`.
@@ -337,7 +337,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
     4. Ante `AIUnavailableError`, `adopt_last_valid_plan`, que envía el aviso más el resumen; si no hay un plan previo, envía "No es posible generar un plan en este momento.".
     5. Cualquier otra excepción se captura por usuario: registra `audit.event("plan_generation", source="monday", outcome="error", reason=…)` y la corrida con `outcome="error"`, y sigue con el usuario siguiente.
   - `format_plan_summary(plan_dict) -> str`, con el formato de `contracts/telegram-bot.md` (`"Tu plan de la semana del dd/mm:"` más líneas `- Día: tipo, x,xx km de trote`).
-- [ ] T049 [US3] Implementar `app/scheduler.py`:
+- [X] T049 [US3] Implementar `app/scheduler.py`:
   - `async tick(state, now)`: abre una conexión y llama a `weekly_job.run_monday` con un `FixedClock(now)`. La parte diaria se agrega en US4.
   - `async run_forever(state)`: un bucle `while True` con `tick(state, state.clock.now())` y `asyncio.sleep(60)`; captura y registra en audit cualquier excepción sin cortar el bucle.
   - En el `lifespan` de `app/main.py`, si el bot arrancó, crear `asyncio.create_task(run_forever(app.state))` y cancelarla al apagar.

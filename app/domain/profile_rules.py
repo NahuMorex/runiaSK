@@ -129,3 +129,26 @@ def to_public(profile: dict, linked: bool) -> dict:
         "send_time": units.format_hhmm(send) if send is not None else None,
         "telegram_linked": linked,
     }
+
+
+def missing_field_message(profile: dict, linked: bool) -> str | None:
+    """Primer dato faltante para generar un plan, en el orden de data-model.md (FR-012)."""
+    checks = [
+        ("level", "nivel"),
+        ("frequency", "frecuencia"),
+        ("target_distance_hm", "distancia objetivo"),
+    ]
+    for key, name in checks:
+        if profile.get(key) is None:
+            return f"No hay datos sobre tu {name} cargados en tu perfil"
+    if profile.get("level") != "novato" and profile.get("current_pace_s") is None:
+        return "No hay datos sobre tu ritmo cargados en tu perfil"
+    if not profile.get("city"):
+        return "No hay datos sobre tu ciudad cargados en tu perfil"
+    if profile.get("range_start_min") is None or profile.get("range_end_min") is None:
+        return "No hay datos sobre tu rango horario cargados en tu perfil"
+    if profile.get("send_time_min") is None:
+        return "No hay datos sobre tu hora de envío cargados en tu perfil"
+    if not linked:
+        return "Tu cuenta no tiene un chat de Telegram vinculado"
+    return None

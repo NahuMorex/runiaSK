@@ -1,18 +1,19 @@
 """Aplicación FastAPI: API + bot de Telegram + scheduler en un solo proceso."""
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
-from app import audit, config, db
-from app.api import auth, profile, telegram_link
+from app import audit, config, db, scheduler
+from app.ai import propose_week_plan
+from app.api import auth, plan, profile, telegram_link
+from app.bot.handlers import build_application
 from app.clock import SystemClock
+from app.services.notifier import TelegramNotifier
 
 
 async def _start_bot(app: FastAPI, token: str):
-    from app.bot.handlers import build_application
-    from app.services.notifier import TelegramNotifier
-
     application = build_application(token, app.state)
     await application.initialize()
     await application.start()
@@ -43,6 +44,8 @@ def create_app(
     async def lifespan(app: FastAPI):
         audit.configure_logging()
         config.jwt_secret()  # sin JWT_SECRET la app no arranca (principio II)
+        if app.state.uses_default_ai:
+            config.google_api_key()
         conn = db.connect(app.state.db_path)
         try:
             db.init_db(conn)
@@ -50,21 +53,28 @@ def create_app(
             conn.close()
 
         application = None
+        ticker = None
         token = config.telegram_bot_token()
         if start_background and token is not None:
             application = await _start_bot(app, token)
+            ticker = asyncio.create_task(scheduler.run_forever(app.state))
         else:
             audit.event("startup", bot=False)
         try:
             yield
         finally:
+            if ticker is not None:
+                ticker.cancel()
+                with suppress(asyncio.CancelledError):
+                    await ticker
             if application is not None:
                 await _stop_bot(application)
 
     app = FastAPI(title="Runia", lifespan=lifespan)
     app.state.db_path = db_path or config.db_path()
     app.state.clock = clock or SystemClock()
-    app.state.planner = planner
+    app.state.uses_default_ai = planner is None
+    app.state.planner = planner or propose_week_plan
     app.state.writer = writer
     app.state.weather = weather
     app.state.notifier = notifier
@@ -72,6 +82,7 @@ def create_app(
     app.include_router(auth.router)
     app.include_router(profile.router)
     app.include_router(telegram_link.router)
+    app.include_router(plan.router)
     return app
 
 
