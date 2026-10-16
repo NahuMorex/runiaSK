@@ -1,5 +1,6 @@
 """Auditoría (R-18, FR-045) y ausencia de secretos en los logs (SC-008)."""
 
+import asyncio
 import json
 import logging
 import traceback
@@ -120,6 +121,37 @@ def test_rejected_bot_token_does_not_leak_on_startup(db_path, monkeypatch, caplo
         ev["type"] == "external_error" and ev["service"] == "telegram" and ev["reason"] == "InvalidToken"
         for ev in _events(caplog)
     )
+
+
+class StartingApplication:
+    """Aplicación de PTB que arranca y se detiene sin tocar la red."""
+
+    def __init__(self):
+        self.bot = object()
+        self.updater = SimpleNamespace(start_polling=self._noop, stop=self._noop)
+
+    async def _noop(self):
+        pass
+
+    initialize = start = stop = shutdown = _noop
+
+
+def test_startup_with_bot_logs_bot_and_scheduler(db_path, monkeypatch, caplog):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", FAKE_BOT_TOKEN)
+    monkeypatch.setattr(main, "build_application", lambda token, state: StartingApplication())
+
+    async def idle(state):
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(main.scheduler, "run_forever", idle)
+    caplog.set_level(logging.INFO, logger="runia.audit")
+
+    with TestClient(main.create_app(db_path=db_path, notifier=FakeNotifier(), weather=MockedOpenWeather())):
+        pass
+
+    startups = [ev for ev in _events(caplog) if ev["type"] == "startup"]
+    assert any(ev.get("bot") is True for ev in startups)
+    assert any(ev.get("scheduler") is True for ev in startups)
 
 
 # --- Dobles: cliente de google-genai y transporte de OpenWeatherMap -----------

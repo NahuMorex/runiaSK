@@ -36,8 +36,11 @@ grep -rn "google.genai\|from google import genai" app/ | grep -v "^app/ai/" || e
 uv run --env-file .env uvicorn app.main:app --reload
 ```
 
-Resultado esperado: en los logs JSON aparecen el arranque de la API, el bot y el scheduler. Si se lanza sin
-`TELEGRAM_BOT_TOKEN`, la API arranca sin el bot ni el scheduler.
+Resultado esperado: en los logs JSON aparecen los eventos `{"type": "startup", "bot": true}` y
+`{"type": "startup", "scheduler": true}`. Si se lanza sin `TELEGRAM_BOT_TOKEN`, la API arranca sin el bot ni el
+scheduler y aparece `{"type": "startup", "bot": false}`. Si Telegram rechaza el token, la app no arranca: se registra
+`external_error` con `service: "telegram"` y el error no incluye el token. Las líneas propias de uvicorn
+(`INFO: Started server process…`, accesos HTTP) no son JSON; los eventos de auditoría sí.
 
 ## 4. Flujo principal (US1 → US2 → US3)
 

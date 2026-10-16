@@ -73,6 +73,7 @@ def create_app(
         if start_background and token is not None:
             application = await _start_bot(app, token)
             ticker = asyncio.create_task(scheduler.run_forever(app.state))
+            audit.event("startup", scheduler=True)
         else:
             audit.event("startup", bot=False)
         try:
