@@ -458,3 +458,26 @@ def upsert_pending_reclass(conn: sqlite3.Connection, user_id: int, remaining: in
         "ON CONFLICT (user_id) DO UPDATE SET remaining = MAX(remaining, excluded.remaining)",
         (user_id, remaining),
     )
+
+
+# --- Cronograma e historial (R-19) -------------------------------------------
+
+
+def sessions_with_results_for_week(conn: sqlite3.Connection, user_id: int, week_start: date) -> list[dict] | None:
+    """Sesiones del plan de la semana, con bloques y resultado; None si no hay plan."""
+    plan = get_plan_for_week(conn, user_id, week_start)
+    if plan is None:
+        return None
+    return get_plan_sessions(conn, plan["id"])
+
+
+def history_sessions(conn: sqlite3.Connection, user_id: int, today: date) -> list[dict]:
+    """Sesiones con fecha anterior a hoy, más las que ya tienen resultado, por fecha descendente."""
+    rows = conn.execute(
+        "SELECT s.*, r.status AS result_status, r.rpe AS result_rpe, r.notes AS result_notes "
+        "FROM sessions s LEFT JOIN session_results r ON r.session_id = s.id "
+        "WHERE s.user_id = ? AND (s.date < ? OR r.session_id IS NOT NULL) ORDER BY s.date DESC",
+        (user_id, _iso(today)),
+    ).fetchall()
+    blocks = _blocks_for_sessions(conn, [r["id"] for r in rows])
+    return [_session_dict(r, blocks[r["id"]]) for r in rows]
