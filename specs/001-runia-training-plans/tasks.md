@@ -456,7 +456,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Tests for User Story 6 ⚠️
 
-- [ ] T065 [P] [US6] Escribir `tests/integration/test_results.py`:
+- [X] T065 [P] [US6] Escribir `tests/integration/test_results.py`:
   - Un registro `completed` con RPE 6 da 201, con y sin notas (AC-29, AC-34). Un `skipped` sin RPE da 201 (AC-30).
   - Dan 422: `completed` sin RPE (AC-31), RPE 0 u 11 (AC-32), `skipped` con RPE, una sesión de ayer o de mañana (AC-69) y una sesión `postponed_weather`, que además conserva su estado (AC-81, AC-41).
   - Un segundo registro da 409 y no cambia el primero (AC-33).
@@ -464,7 +464,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - Un `partial` con RPE 7 el sábado, con una sola sesión restante, la convierte y deja `pending_reclassifications.remaining=1`. El plan siguiente generado convierte su primera sesión y consume la fila (FR-042).
   - Un `partial` con RPE 6 no reclasifica.
   - `/registrar` por el núcleo del bot: `handle_registrar(conn, clock, chat_id, ["completada","6","buenas","piernas"])` da el texto de éxito y `["completada"]` da el texto de RPE.
-- [ ] T066 [P] [US6] Escribir `tests/integration/test_isolation.py`:
+- [X] T066 [P] [US6] Escribir `tests/integration/test_isolation.py`:
   - El usuario B hace `POST /sessions/{id de A}/result` y recibe 403 con `{"detail": "Acceso denegado"}`, sin ningún dato de A, y el registro de A no cambia (AC-37).
   - Un `session_id` inexistente da 404.
   - Con el chat de B, `/registrar` solo afecta la sesión de B, y si B no tiene sesión hoy responde "No tenés una sesión planificada para hoy." sin tocar la de A (AC-38).
@@ -472,19 +472,19 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Implementation for User Story 6
 
-- [ ] T067 [P] [US6] Implementar `app/domain/reclassification.py` con `targets_after(session_date, upcoming_sessions: list[(id, date)]) -> (ids_to_convert: list[int], remaining_pending: int)`. Toma las 2 primeras sesiones con fecha mayor a `session_date`, y `remaining_pending = 2 - len(ids)` si no alcanzan. Las sesiones pospuestas no cuentan como objetivo.
-- [ ] T068 [US6] Agregar a `app/services/repository.py`:
+- [X] T067 [P] [US6] Implementar `app/domain/reclassification.py` con `targets_after(session_date, upcoming_sessions: list[(id, date)]) -> (ids_to_convert: list[int], remaining_pending: int)`. Toma las 2 primeras sesiones con fecha mayor a `session_date`, y `remaining_pending = 2 - len(ids)` si no alcanzan. Las sesiones pospuestas no cuentan como objetivo.
+- [X] T068 [US6] Agregar a `app/services/repository.py`:
   - `get_session(conn, session_id)` y `get_result(conn, session_id)`.
   - `insert_result(conn, session_id, user_id, status, rpe, notes, now)`.
   - `upcoming_sessions(conn, user_id, after_date)`, que solo devuelve las sesiones de planes ya existentes.
   - `replace_session_blocks(conn, session_id, blocks, title, reclassified=True)`.
   - `upsert_pending_reclass(conn, user_id, remaining)`, que se queda con el máximo entre el valor existente y el nuevo.
-- [ ] T069 [US6] Implementar `app/services/results.py` con `register_result(conn, user_id, session_id, status, rpe, notes, today, clock) -> dict`.
+- [X] T069 [US6] Implementar `app/services/results.py` con `register_result(conn, user_id, session_id, status, rpe, notes, today, clock) -> dict`.
   - Valida en el orden del contrato y lanza `SessionNotFound`, `Forbidden`, `PostponedSession`, `NotToday`, `AlreadyRegistered` o `InvalidRpe`.
   - Dentro de `transaction`, inserta el resultado. Si es `partial` con RPE ≥ 7, llama a `targets_after`, ejecuta `replace_session_blocks(reclassify(blocks))` (las suaves conservan sus bloques y su título; solo se marca `reclassified=1`; las de calidad convertidas pasan a `title = EASY_TITLE`) y `upsert_pending_reclass`, y emite `audit.event("guardrail", rule="reclassification", before, after)`. Siempre emite `audit.event("tool_call", tool="db", op="register_result")`.
   - Devuelve `{session_id, status, rpe, notes, reclassified_sessions, pending_reclassification}`.
-- [ ] T070 [US6] Implementar en `app/api/sessions.py` el endpoint `POST /sessions/{session_id}/result` con un body pydantic: `status: Literal["completed","partial","skipped"]`, `rpe: int|None` entre 1 y 10, y `notes: str|None` de hasta 500 caracteres. Un `model_validator` exige `rpe` si el estado es `completed` o `partial` y lo prohíbe si es `skipped`. Mapear las excepciones a 404, 403, 422, 422, 409 y 422 con los `detail` exactos del contrato y responder 201 si todo sale bien. Registrar el router en `app/main.py`.
-- [ ] T071 [US6] Agregar a `app/bot/handlers.py` el núcleo `async handle_registrar(conn, clock, chat_id, args) -> str` y su `CommandHandler("registrar")`. El núcleo resuelve el usuario por chat y la sesión de hoy, parsea el estado (`completada`, `parcial` o `salteada`), el RPE y las notas, y llama a `register_result`. Mapea cada excepción al texto de `contracts/telegram-bot.md` y no expone ids ni datos de otros usuarios (R-08). Ejecutar `uv run pytest tests/integration/test_results.py tests/integration/test_isolation.py`.
+- [X] T070 [US6] Implementar en `app/api/sessions.py` el endpoint `POST /sessions/{session_id}/result` con un body pydantic: `status: Literal["completed","partial","skipped"]`, `rpe: int|None` entre 1 y 10, y `notes: str|None` de hasta 500 caracteres. Un `model_validator` exige `rpe` si el estado es `completed` o `partial` y lo prohíbe si es `skipped`. Mapear las excepciones a 404, 403, 422, 422, 409 y 422 con los `detail` exactos del contrato y responder 201 si todo sale bien. Registrar el router en `app/main.py`.
+- [X] T071 [US6] Agregar a `app/bot/handlers.py` el núcleo `async handle_registrar(conn, clock, chat_id, args) -> str` y su `CommandHandler("registrar")`. El núcleo resuelve el usuario por chat y la sesión de hoy, parsea el estado (`completada`, `parcial` o `salteada`), el RPE y las notas, y llama a `register_result`. Mapea cada excepción al texto de `contracts/telegram-bot.md` y no expone ids ni datos de otros usuarios (R-08). Ejecutar `uv run pytest tests/integration/test_results.py tests/integration/test_isolation.py`.
 
 **Checkpoint**: US6 funciona. La reclasificación se integra con el plan siguiente de US3.
 
