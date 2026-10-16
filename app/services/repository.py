@@ -401,3 +401,60 @@ def expired_dispatches(conn: sqlite3.Connection, cutoff_iso: str) -> list:
         "SELECT * FROM daily_dispatches WHERE state = 'awaiting_fatigue' AND asked_at <= ? ORDER BY id",
         (cutoff_iso,),
     ).fetchall()
+
+
+# --- Resultados y reclasificación -------------------------------------------
+
+
+def get_session(conn: sqlite3.Connection, session_id: int) -> dict | None:
+    row = conn.execute(
+        "SELECT s.*, r.status AS result_status, r.rpe AS result_rpe, r.notes AS result_notes "
+        "FROM sessions s LEFT JOIN session_results r ON r.session_id = s.id WHERE s.id = ?",
+        (session_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return _session_dict(row, get_session_blocks(conn, row["id"]))
+
+
+def get_result(conn: sqlite3.Connection, session_id: int):
+    return conn.execute("SELECT * FROM session_results WHERE session_id = ?", (session_id,)).fetchone()
+
+
+def insert_result(
+    conn: sqlite3.Connection, session_id: int, user_id: int, status: str, rpe: int | None, notes: str | None, now
+) -> None:
+    conn.execute(
+        "INSERT INTO session_results (session_id, user_id, status, rpe, notes, recorded_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (session_id, user_id, status, rpe, notes, _iso(now)),
+    )
+
+
+def upcoming_sessions(conn: sqlite3.Connection, user_id: int, after_date: date) -> list[tuple[int, date]]:
+    """Sesiones ya guardadas posteriores a `after_date`, sin las pospuestas por clima, por fecha."""
+    return [
+        (r["id"], date.fromisoformat(r["date"]))
+        for r in conn.execute(
+            "SELECT id, date FROM sessions WHERE user_id = ? AND date > ? AND system_status IS NULL ORDER BY date",
+            (user_id, _iso(after_date)),
+        )
+    ]
+
+
+def replace_session_blocks(
+    conn: sqlite3.Connection, session_id: int, blocks: list[Block], title: str, reclassified: bool = True
+) -> None:
+    conn.execute(
+        "UPDATE sessions SET title = ?, reclassified = ? WHERE id = ?", (title, int(reclassified), session_id)
+    )
+    conn.execute("DELETE FROM blocks WHERE session_id = ?", (session_id,))
+    _insert_blocks(conn, session_id, blocks)
+
+
+def upsert_pending_reclass(conn: sqlite3.Connection, user_id: int, remaining: int) -> None:
+    """Se queda con el mayor entre el pendiente guardado y el nuevo."""
+    conn.execute(
+        "INSERT INTO pending_reclassifications (user_id, remaining) VALUES (?, ?) "
+        "ON CONFLICT (user_id) DO UPDATE SET remaining = MAX(remaining, excluded.remaining)",
+        (user_id, remaining),
+    )
