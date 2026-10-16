@@ -549,7 +549,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 **Purpose**: contrato de la API, auditoría, secretos, rendimiento y validación final.
 
-- [ ] T082 [P] Escribir `tests/contract/test_api_contract.py`. Para cada endpoint de `contracts/api.md`, verificar el código de estado y las claves exactas del cuerpo de éxito (`Profile`, `Plan`, `HistoryItem`, `{access_token, token_type, expires_at}`, `{code, expires_at, instructions}`), los `detail` literales de los mensajes fijos y la presencia de `X-Session-Token` en las respuestas autenticadas (salvo en el 204 de DELETE).
+- [X] T082 [P] Escribir `tests/contract/test_api_contract.py`. Para cada endpoint de `contracts/api.md`, verificar el código de estado y las claves exactas del cuerpo de éxito (`Profile`, `Plan`, `HistoryItem`, `{access_token, token_type, expires_at}`, `{code, expires_at, instructions}`), los `detail` literales de los mensajes fijos y la presencia de `X-Session-Token` en las respuestas autenticadas (salvo en el 204 de DELETE).
 - [ ] T083 [P] Escribir `tests/unit/test_audit.py` con `caplog` sobre `runia.audit`:
   - `redact` oculta `password`, `access_token`, `api_key`, `code` y `Authorization`, también anidados.
   - Recorrer los flujos de `POST /plan` (con un recorte), el dispatch diario (con una falla de clima y una posposición) y el registro con reclasificación, y verificar que se emiten `llm_call`, `tool_call` (con `tool="db"` y cada `op` de la lista cerrada de R-18; para eso recorrer también registro, login, edición del perfil, vinculación, reseteo de contraseña, fallback del lunes y borrado de cuenta), `guardrail` (con `before` y `after`), `session_postponed`, `external_error` y `weather_decision` (FR-045).
