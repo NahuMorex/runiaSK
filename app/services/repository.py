@@ -306,7 +306,8 @@ def get_session_for_user_on(conn: sqlite3.Connection, user_id: int, day: date) -
 
 
 def users_due_for_dispatch(conn: sqlite3.Connection, today: date, now_min: int) -> list:
-    """Usuarios vinculados cuya hora de envío ya llegó, con sesión hoy sin resultado y sin dispatch (FR-029)."""
+    """Usuarios vinculados cuya hora de envío ya llegó, con sesión hoy sin resultado, sin pospuesta y sin
+    dispatch (FR-029, FR-038)."""
     return conn.execute(
         "SELECT l.user_id, l.chat_id, s.id AS session_id FROM telegram_links l "
         "JOIN profiles p ON p.user_id = l.user_id "
@@ -314,6 +315,7 @@ def users_due_for_dispatch(conn: sqlite3.Connection, today: date, now_min: int) 
         "LEFT JOIN session_results r ON r.session_id = s.id "
         "LEFT JOIN daily_dispatches d ON d.user_id = l.user_id AND d.date = ? "
         "WHERE p.send_time_min IS NOT NULL AND p.send_time_min <= ? AND r.session_id IS NULL AND d.id IS NULL "
+        "AND s.system_status IS NULL "
         "ORDER BY l.user_id",
         (_iso(today), _iso(today), now_min),
     ).fetchall()

@@ -1,6 +1,7 @@
 """Flujo diario a la hora de envío: pregunta de fatiga, espera de 2 h y mensaje (FR-029..FR-032)."""
 
 import asyncio
+import json
 import re
 import sqlite3
 from datetime import date, datetime, timedelta
@@ -9,7 +10,9 @@ from typing import Awaitable, Callable
 from app import audit
 from app.ai import AIUnavailableError, DailyMessageData
 from app.clock import TZ, Clock
-from app.domain import daily_message
+from app.domain import daily_message, weather_rules, weeks
+from app.domain.models import WeatherAssessment
+from app.integrations.openweather import WeatherUnavailableError
 from app.services import repository
 
 Writer = Callable[[DailyMessageData], Awaitable[str]]
@@ -27,18 +30,63 @@ def _parse_fatigue(text: str | None) -> int | None:
     return value if 1 <= value <= 10 else None
 
 
-async def start_dispatches(conn: sqlite3.Connection, clock: Clock, notifier, weather) -> None:
-    """Crea el dispatch y pregunta la fatiga a cada usuario debido.
+async def _assess_weather(weather, user_id: int, profile: dict, today: date) -> WeatherAssessment | None:
+    """Evaluación climática con la ciudad y el rango vigentes (FR-034, AC-71). None si no hay servicio inyectado."""
+    if weather is None:
+        return None
+    try:
+        forecast = await weather.fetch_forecast(profile["city"])
+    except WeatherUnavailableError as exc:
+        audit.event("external_error", service="openweather", reason=exc.reason, user_id=user_id)
+        return weather_rules.unavailable()
+    except Exception as exc:
+        audit.event("external_error", service="openweather", reason="error", detail=type(exc).__name__, user_id=user_id)
+        return weather_rules.unavailable()
+    assessment = weather_rules.assess(forecast.slots, today, profile["range_start_min"], profile["range_end_min"])
+    audit.event(
+        "weather_decision",
+        user_id=user_id,
+        unfavorable=assessment.unfavorable,
+        extreme=assessment.extreme,
+        alternative=assessment.alternative_date,
+        postpone=assessment.postpone,
+    )
+    return assessment
 
-    `weather` es el hook de US5; por ahora no se evalúa el clima.
-    """
+
+async def _postpone(conn: sqlite3.Connection, now: datetime, notifier, row, assessment: WeatherAssessment) -> None:
+    """FR-037, FR-038: la sesión queda pospuesta y se envía un único aviso, sin pregunta de fatiga."""
+    user_id = row["user_id"]
+    reason = " y ".join(assessment.reasons)
+    repository.set_session_postponed(conn, row["session_id"], reason)
+    audit.event("tool_call", tool="db", op="set_session_postponed", user_id=user_id)
+    count = repository.count_postponed_in_week(conn, user_id, weeks.week_start(now.date()))
+    audit.event("session_postponed", user_id=user_id, session_id=row["session_id"], reason=reason, count_week=count)
+    delivered = bool(await notifier.send_message(row["chat_id"], weather_rules.postponement_message(reason, count)))
+    dispatch_id = repository.create_dispatch(
+        conn, user_id, row["session_id"], now.date(), now, state="postponed_sent", delivered=delivered
+    )
+    audit.event("tool_call", tool="db", op="create_dispatch", user_id=user_id)
+    if dispatch_id is not None:
+        repository.set_dispatch_weather(conn, dispatch_id, weather_rules.assessment_to_dict(assessment))
+
+
+async def start_dispatches(conn: sqlite3.Connection, clock: Clock, notifier, weather) -> None:
+    """Evalúa el clima y, salvo que la sesión se posponga, crea el dispatch y pregunta la fatiga."""
     now = clock.now()
     today = now.date()
     for row in repository.users_due_for_dispatch(conn, today, now.hour * 60 + now.minute):
         try:
-            if repository.create_dispatch(conn, row["user_id"], row["session_id"], today, now) is None:
+            assessment = await _assess_weather(weather, row["user_id"], repository.get_profile(conn, row["user_id"]), today)
+            if assessment is not None and assessment.postpone:
+                await _postpone(conn, now, notifier, row, assessment)
+                continue
+            dispatch_id = repository.create_dispatch(conn, row["user_id"], row["session_id"], today, now)
+            if dispatch_id is None:
                 continue
             audit.event("tool_call", tool="db", op="create_dispatch", user_id=row["user_id"])
+            if assessment is not None:
+                repository.set_dispatch_weather(conn, dispatch_id, weather_rules.assessment_to_dict(assessment))
             await notifier.send_message(row["chat_id"], daily_message.FATIGUE_QUESTION)
         except Exception as exc:  # la falla de un usuario no corta a los demás
             audit.event("daily_dispatch_error", user_id=row["user_id"], reason=type(exc).__name__)
@@ -102,7 +150,11 @@ async def compose_and_send(
     user_id = dispatch["user_id"]
     session = repository.get_session_for_user_on(conn, user_id, date.fromisoformat(dispatch["date"]))
     profile = repository.get_profile(conn, user_id)
-    data = daily_message.build_message_data(session, profile, fatigue, None, False)
+    assessment = None
+    if dispatch["weather_json"]:
+        assessment = weather_rules.assessment_from_dict(json.loads(dispatch["weather_json"]))
+    unavailable = assessment is not None and not assessment.available
+    data = daily_message.build_message_data(session, profile, fatigue, None if unavailable else assessment, unavailable)
 
     text = await _draft(writer, data)
     used_template = text is None
