@@ -92,7 +92,9 @@ Los tiempos objetivo **no** forman parte del esquema: los calcula el sistema (R-
 - **Plan**: sistema en español. Debe proponer exactamente `sessions_required` sesiones en fechas distintas de `allowed_dates`.
   En la primera semana de un novato, cada sesión alterna bloques `walk` y `run` con km. Un tramo con `target_pace_s` solo aparece
   si `quality_allowed`, y como máximo una sesión de calidad por semana. Cada tramo de calidad salvo el último lleva
-  `recovery_after_s`. Debe respetar `max_session_km` y `target_volume_km` como orientación. No da consejo médico ni de lesiones.
+  `recovery_after_s`. Debe respetar `max_session_km` y `target_volume_km` como orientación. Todo el trote va en bloques `run`
+  con km: la entrada en calor y la vuelta a la calma, si se proponen, son bloques `run` (cuentan para el volumen) o `walk`, nunca
+  km implícitos en el título o el texto (FR-019). No da consejo médico ni de lesiones.
 - **Mensaje diario**: como máximo 120 palabras (margen frente al límite de 150), en texto plano, sin preguntas ni markdown,
   sin números distintos de los recibidos, con todos los campos no nulos de `DailyMessageData` escritos literalmente,
   y sin consejo médico ni de lesiones.

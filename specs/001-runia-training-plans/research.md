@@ -201,6 +201,10 @@ al diseño, incluidas las respuestas a los ítems abiertos de `checklists/guardr
   **por día de la semana** a las fechas de la semana actual, con los mismos bloques, y pasan por el pipeline completo de R-06
   con el contexto de la semana actual, incluida la reclasificación pendiente. El plan resultante se guarda con
   `source='fallback'`, `adopted_from_plan_id` y su propio `planned_volume_hm`, que es la base para la semana siguiente (CHK020).
+  El plan adoptado se guarda con `start_date = week_start` (el lunes) y, por lo tanto, `is_full=1`, aunque el plan
+  original haya sido parcial y tenga menos sesiones que la frecuencia (excepción de FR-016). Por eso le aplican los
+  pisos de la semana completa y es la base del 10% de la semana siguiente. La reclasificación pendiente se consume
+  en la misma transacción en que se guarda, igual que en un plan generado.
 - **Rationale**: cumple FR-017 y SC-001, porque ningún plan se entrega sin guardarraíles, y AC-16 ("mismos días y sesiones").
 
 ## R-14 · Base de conocimiento `kb.md`
@@ -248,8 +252,11 @@ al diseño, incluidas las respuestas a los ítems abiertos de `checklists/guardr
   (alerta, alternativa, posposición), `message_sent` (plantilla o modelo) y `plan_generation` (fuente, resultado).
   La redacción recursiva reemplaza por `"[redacted]"` los valores de las claves `password`, `token`, `access_token`,
   `api_key`, `authorization`, `code` y `secret`. Los historiales nunca se pasan: solo resúmenes semanales.
-  Para `tool_call: db` se registra un evento por operación de servicio (p. ej. `save_plan`, `register_result`),
-  no por cada sentencia SQL.
+  Para `tool_call: db` se registra un evento por operación de servicio, no por cada sentencia SQL. La lista de
+  operaciones auditadas es cerrada: `register`, `login`, `update_profile`, `create_link_code`, `link_chat`,
+  `save_plan`, `adopt_plan`, `register_result`, `set_session_postponed`, `create_dispatch`, `set_dispatch_sent`,
+  `create_reset_code`, `reset_password` y `delete_account`. Son todas las operaciones que modifican datos, más el
+  login; las lecturas no se auditan. Los códigos de un solo uso nunca se registran.
 - **Rationale**: cubre la lista cerrada de RNF-02 con un solo punto de salida que se puede testear con `caplog`.
 
 ## R-19 · Historial y cronograma (AC-35, AC-36)

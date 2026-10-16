@@ -11,7 +11,7 @@ description: "Lista de tareas para implementar Runia (PRD-001)"
 
 **Tests**: Se incluyen. La constitución ("Flujo de desarrollo") exige que `uv run pytest` pase antes de cerrar cada tarea y que la
 lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios externos. El plan ya fija los archivos de
-`tests/`. Dentro de cada historia, los tests se escriben primero y deben fallar antes de implementar. Una tarea de tests se cierra junto con su tarea de implementación: `uv run pytest` tiene que estar en verde al llegar al checkpoint de la historia, que es donde se aplica la regla de la constitución.
+`tests/`. Dentro de cada historia, los tests se escriben primero y deben fallar antes de implementar. Una tarea de tests se cierra junto con su tarea de implementación: `uv run pytest` tiene que estar en verde al llegar al checkpoint de la historia, que es donde se aplica la regla de la constitución. Ninguna tarea de una fase se marca `[x]` antes de que su checkpoint pase `uv run pytest` en verde; al pasar, se marcan todas juntas. Así ninguna tarea se cierra con tests en rojo.
 
 **Organization**: Las tareas están agrupadas por historia de usuario para que cada una se pueda implementar y testear por separado.
 
@@ -83,7 +83,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - `WEEKDAY_NAMES_ES = ["lunes", …, "domingo"]` y `weekday_es(d)`.
 - [ ] T009 Implementar `app/db.py`:
   - `connect(path) -> sqlite3.Connection`, con `check_same_thread=False`, `row_factory=sqlite3.Row`, `PRAGMA foreign_keys=ON` y `PRAGMA journal_mode=WAL` (este último salvo con `:memory:`).
-  - `init_db(conn)`: `CREATE TABLE IF NOT EXISTS` de las 10 tablas de `data-model.md` (`users`, `profiles`, `telegram_links`, `one_time_codes`, `plans`, `sessions`, `blocks`, `session_results`, `pending_reclassifications`, `daily_dispatches`, `weekly_generation_runs`), con sus `UNIQUE`, `CHECK` de enums y rangos, `FOREIGN KEY … ON DELETE CASCADE` y `adopted_from_plan_id … ON DELETE SET NULL`.
+  - `init_db(conn)`: `CREATE TABLE IF NOT EXISTS` de las 11 tablas de `data-model.md` (`users`, `profiles`, `telegram_links`, `one_time_codes`, `plans`, `sessions`, `blocks`, `session_results`, `pending_reclassifications`, `daily_dispatches`, `weekly_generation_runs`), con sus `UNIQUE`, `CHECK` de enums y rangos, `FOREIGN KEY … ON DELETE CASCADE` y `adopted_from_plan_id … ON DELETE SET NULL`.
   - `@contextmanager transaction(conn)`: `BEGIN IMMEDIATE`, y después commit o rollback.
 - [ ] T010 [P] Implementar `app/domain/models.py`:
   - Dataclasses (`frozen` donde se pueda): `Block(kind: Literal["walk","run"], distance_hm: int, target_pace_s: int|None=None, target_time_s: int|None=None, recovery_after_s: int|None=None)`, `PlannedSession(date, title, blocks: list[Block], reclassified=False)`, `WeekSummary(week_start, has_plan, is_full, is_deload, planned_volume_hm, completed_count, has_partial_rpe7, profile_snapshot: dict|None)`, `GuardrailEvent(rule, scope, session_date, before, after)`, `GuardrailContext` (campos de data-model "Entidades de dominio sin tabla") y `WeatherAssessment(available, unfavorable, extreme, reasons: list[str], alternative_date: date|None, postpone: bool)`, y el modelo pydantic `DailyMessageData` con los campos de `contracts/ai-module.md` (vive acá porque `domain/` no puede importar `app.ai`).
@@ -162,7 +162,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - `POST /login` responde 200 `{access_token, token_type: "bearer", expires_at}`, o 401 `{"detail": "Credenciales inválidas"}`.
 - [ ] T024 [US1] Implementar `app/api/profile.py` (`APIRouter(prefix="/profile")`), donde todas las rutas dependen de `get_current_user`:
   - `GET ""` devuelve `to_public`.
-  - `PUT ""` valida con `merge_and_validate`, guarda con `update_profile` en una transacción y responde 200. Si la validación falla, responde 422 con `detail` sin persistir nada.
+  - `PUT ""` valida con `merge_and_validate`, guarda con `update_profile` en una transacción, emite `audit.event("tool_call", tool="db", op="update_profile")` y responde 200. Si la validación falla, responde 422 con `detail` sin persistir nada.
 - [ ] T025 [US1] Registrar los routers `auth` y `profile` en `create_app` de `app/main.py`. Ejecutar `uv run pytest tests/unit/test_profile_rules.py tests/integration/test_auth_api.py tests/integration/test_profile_api.py` hasta que todo pase.
 
 **Checkpoint**: US1 funciona y se puede testear sola.
@@ -195,13 +195,13 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - `find_valid_code(conn, purpose, code_hash, now) -> user_id|None`, que lee sin consumir.
   - `get_user_by_chat(conn, chat_id)` y `create_link(conn, user_id, chat_id, now)`.
 - [ ] T028 [US2] Implementar `app/services/linking.py`:
-  - `create_link_code(conn, user_id, clock) -> (code, expires_at)`: 8 caracteres, vence en 15 min y lanza `AlreadyLinkedError` si la cuenta ya tiene un chat.
+  - `create_link_code(conn, user_id, clock) -> (code, expires_at)`: 8 caracteres, vence en 15 min y lanza `AlreadyLinkedError` si la cuenta ya tiene un chat. Emite `audit.event("tool_call", tool="db", op="create_link_code")` sin el código.
   - `link_chat(conn, chat_id, code, clock) -> Literal["linked","invalid","already_linked"]`: dentro de `transaction`, busca el código válido, verifica que ni el chat ni la cuenta estén vinculados y solo después consume el código y crea el vínculo.
   - Registrar `audit.event("tool_call", tool="db", op="link_chat", outcome=…)`.
 - [ ] T029 [US2] Implementar `app/api/telegram_link.py` con `POST /telegram/link-code`. Responde 201 con `{code, expires_at, instructions}` (el texto del contrato) o 409 con `{"detail": "Tu cuenta ya tiene un chat de Telegram vinculado"}`. Registrarlo en `app/main.py`.
 - [ ] T030 [US2] Implementar `app/bot/handlers.py`. Hay dos capas:
   - **Funciones núcleo**, testeables: `async handle_start() -> str` y `async handle_vincular(conn, clock, chat_id, args) -> str`. Devuelven los textos exactos de `contracts/telegram-bot.md`; si falta el argumento, devuelven el texto de código inválido.
-  - **Adaptadores PTB**: `build_application(token, app_state) -> telegram.ext.Application`, que registra `CommandHandler("start")` y `CommandHandler("vincular")`. Cada adaptador abre su propia conexión con `db.connect(app_state.db_path)` y responde con `update.message.reply_text(text)`.
+  - **Adaptadores PTB**: `build_application(token, app_state) -> telegram.ext.Application`, que registra `CommandHandler("start")` y `CommandHandler("vincular")`. Cada adaptador abre su propia conexión con `db.connect(app_state.db_path)` y responde con `update.message.reply_text(text)`. La aplicación se construye con `ApplicationBuilder().token(token).concurrent_updates(True).build()`, para que las respuestas de fatiga de varios usuarios se procesen en paralelo (SC-004); con WAL y el `timeout` por defecto de 5 s de `sqlite3` alcanza para 10 escrituras concurrentes.
 - [ ] T031 [US2] En el `lifespan` de `app/main.py`, si `start_background` es verdadero y `config.telegram_bot_token()` no es `None`:
   - Al arrancar: `application = build_application(...)`, después `await application.initialize()`, `await application.start()` y `await application.updater.start_polling()`, y guardar `app.state.notifier = TelegramNotifier(application.bot)`, salvo que se haya inyectado otro notifier.
   - Al apagar: `updater.stop()`, `stop()` y `shutdown()`.
@@ -261,7 +261,19 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - Un segundo tick no duplica nada.
   - Si `FakePlanner` falla y hay un plan previo, el sistema adopta los mismos días de la semana, aplica los guardarraíles actuales (si la semana previa no tuvo Completadas, el volumen no supera el planificado), usa `source='fallback'` y envía el mensaje con el aviso exacto (AC-16).
   - Si falla sin un plan previo, envía "No es posible generar un plan en este momento." y no crea ningún plan (AC-17b). Un tick posterior no reenvía el mensaje.
+  - Con una reclasificación pendiente de 1 y un `FakePlanner` que falla, el plan adoptado tiene la primera sesión reclasificada a suave, `get_pending_reclass` queda en 0 y el plan del lunes siguiente no reclasifica nada (FR-042).
+  - Si el último plan válido fue parcial (jueves a domingo, 3 sesiones), el plan adoptado tiene `start_date` el lunes, `is_full=1`, sesiones el jueves, el viernes y el domingo de la semana actual, y se le aplican los pisos (R-13).
   - Si `FakePlanner` lanza `RuntimeError` para un usuario, los demás reciben su plan, la corrida del primero queda con `outcome="error"` y un tick posterior no lo reintenta.
+- [ ] T088 [P] [US3] Verificador independiente de SC-001 (lista cerrada de la spec):
+  - Crear `tests/sc001_check.py` con `check_sc001(sessions: list[PlannedSession], ctx: GuardrailContext) -> list[str]`, que devuelve una violación por regla incumplida. Se reimplementa desde la spec y **no** importa `app.domain.guardrails` (puede usar `app.domain.models` y `app.domain.units`). Los tests lo importan con `from tests.sc001_check import check_sc001` (`pythonpath = ["."]`). Reglas:
+    - Por sesión: km de trote ≤ `min` entre el tope inicial por nivel (si `ctx.initial_caps`) y `target_distance_hm` (FR-018, FR-025).
+    - Semanal: volumen ≤ `min` entre `tope_inicial×frequency`, `floor(base_10_hm×11/10)` (salvo `is_post_deload`), `no_increase_hm`, `floor(deload_v4_hm×8/10)` y `post_deload_target_hm` (FR-018 a FR-021).
+    - Calidad: ninguna sesión de calidad si `level == "novato"` y no `novice_quality_allowed`; como máximo una por semana (FR-022, FR-023).
+    - Ritmo: todo tramo con ritmo en `[fast_pace_limit(p), p]` y `target_time_s == round_half_up(distance_hm × ritmo ÷ 100)` (FR-024).
+    - Reclasificación: las primeras `pending_reclass` sesiones por fecha tienen `reclassified=True` y ninguna es de calidad (FR-042).
+    - Pisos, solo si `ctx.is_full`: volumen ≥ piso − n.º de bloques `run` (en hm), salvo que un tope lo impida: alguna sesión está en su tope o el volumen está en el tope semanal, con la misma tolerancia (FR-026, AC-82).
+  - Escribir `tests/unit/test_sc001.py`: correr `guardrails.apply` sobre una matriz de propuestas adversas (sesiones largas, volumen excesivo, varias de calidad, ritmos fuera de rango, novatos con tramos con ritmo) por cada contexto (topes iniciales, 10%, semana vacía, descarga, posterior a la descarga con y sin Completadas, AC-66, parcial y completa, reclasificación pendiente de 1 y 2, piso bloqueado por un tope) y verificar que `check_sc001` no devuelve violaciones. Agregar casos negativos con planes armados a mano que violan cada regla, para comprobar que el verificador las detecta.
+  - Escribir `tests/integration/test_sc001_delivered.py`: con un `FakePlanner` adverso, verificar con `check_sc001` el plan guardado por `POST /plan`, por la generación del lunes y por el fallback de AC-16, armando `ctx` con `build_context` sobre el historial guardado (SC-001 cuenta los planes generados y los adoptados).
 
 ### Implementation for User Story 3
 
@@ -291,7 +303,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - Si `volumen < piso − n_bloques_run` (la tolerancia), el factor es `min(Fraction(piso, vol), min_s Fraction(tope_s, run_s), Fraction(tope_semanal, vol))`, y se aplica `scale_floor` a los bloques `run` solo si el factor es mayor que 1.
   - Emitir el evento `floor_scale`.
   - Agregar `planned_volume_hm(sessions)`.
-- [ ] T043 [P] [US3] Implementar `app/ai/prompts.py` con `PLAN_SYSTEM_PROMPT` (en español, con las reglas de `contracts/ai-module.md` para el plan y la prohibición de consejo médico o de lesiones) y `build_plan_prompt(req: PlanRequest) -> str`, que serializa `req.model_dump_json()` con instrucciones. No debe incluir ningún email ni chat_id.
+- [ ] T043 [P] [US3] Implementar `app/ai/prompts.py` con `PLAN_SYSTEM_PROMPT` (en español, con las reglas de `contracts/ai-module.md` para el plan, incluida la de que la entrada en calor y la vuelta a la calma, si se proponen, vengan como bloques explícitos `run` o `walk`, sin km implícitos (FR-019), y la prohibición de consejo médico o de lesiones) y `build_plan_prompt(req: PlanRequest) -> str`, que serializa `req.model_dump_json()` con instrucciones. No debe incluir ningún email ni chat_id.
 - [ ] T044 [US3] Implementar en `app/ai/gemini.py`, el único archivo que importa `from google import genai` y `from google.genai import types`:
   - `_client()`: perezoso, con `genai.Client(api_key=config.google_api_key())`.
   - `async propose_week_plan(req) -> WeekPlanProposal`: llama a `asyncio.wait_for(client.aio.models.generate_content(model="gemini-3.5-flash-lite", contents=build_plan_prompt(req), config=types.GenerateContentConfig(system_instruction=PLAN_SYSTEM_PROMPT, response_mime_type="application/json", response_schema=WeekPlanProposal)), 20)` y parsea el resultado con `WeekPlanProposal.model_validate_json(resp.text)`.
@@ -313,7 +325,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
     5. `await planner(req)`, después `validate_proposal` y después `guardrails.apply`. `InvalidProposalError` se trata como `AIUnavailableError("invalid_structure")` y se registra con `audit.event("plan_generation", outcome="failed", reason=…)`.
     6. Guarda dentro de `transaction` con `is_deload=ctx.is_deload` e `is_post_deload=ctx.is_post_deload`, consume la reclasificación pendiente y emite `audit.event("tool_call", tool="db", op="save_plan")`.
     7. Emite `audit.event("guardrail", …)` por cada evento y `audit.event("plan_generation", source, outcome="created", planned_volume_hm)`.
-  - `async adopt_last_valid_plan(conn, user_id, clock) -> plan_id | None` (R-13): mapea por día de la semana las sesiones del último plan a la semana actual y aplica `guardrails.apply` con el contexto actual. Guarda con `source="fallback"` y `adopted_from_plan_id`, y emite `audit.event("tool_call", tool="db", op="adopt_plan")`.
+  - `async adopt_last_valid_plan(conn, user_id, clock) -> plan_id | None` (R-13): mapea por día de la semana las sesiones del último plan a la semana actual y aplica `guardrails.apply` con el contexto actual, armado con `build_context(..., start_date=ws, ...)`. Dentro de una misma `transaction` guarda con `source="fallback"`, `adopted_from_plan_id`, `start_date=ws`, `is_full=True` e `is_deload`/`is_post_deload` tomados de `ctx`, consume la reclasificación pendiente con `consume_pending_reclass` (igual que `build_and_save_plan`) y emite `audit.event("tool_call", tool="db", op="adopt_plan")`.
   - `serialize_plan(conn, plan_id, today) -> dict`, con la forma `Plan` del contrato (`type`, `run_km`, `blocks` con `kind` "trote"/"caminata", `target_pace`, `target_time`, `recovery_after` y `status` calculado con `status_label`).
   - `status_label(session_row, result_row, today) -> str` (R-19).
 - [ ] T047 [US3] Implementar `app/api/plan.py` con `POST /plan`, que depende de `get_current_user` y `planner`. Llama a `build_and_save_plan(source="on_demand")` y mapea las excepciones: `IncompleteProfileError` a 422 con `detail` igual al mensaje, `PlanExistsError` a 409 con "Ya tenés un plan para la semana en curso" y `AIUnavailableError` a 503 con "No es posible generar un plan en este momento.". Si todo sale bien, responde 201 con `serialize_plan`. No llama al notifier. Registrar el router en `app/main.py` e inyectar el `planner` por defecto (`app.ai.propose_week_plan`) en `create_app`. Si se usa el planner por defecto, el `lifespan` llama a `config.google_api_key()` al arrancar (principio II).
@@ -329,7 +341,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - `async tick(state, now)`: abre una conexión y llama a `weekly_job.run_monday` con un `FixedClock(now)`. La parte diaria se agrega en US4.
   - `async run_forever(state)`: un bucle `while True` con `tick(state, state.clock.now())` y `asyncio.sleep(60)`; captura y registra en audit cualquier excepción sin cortar el bucle.
   - En el `lifespan` de `app/main.py`, si el bot arrancó, crear `asyncio.create_task(run_forever(app.state))` y cancelarla al apagar.
-  - Ejecutar `uv run pytest tests/unit/test_structure.py tests/unit/test_summaries.py tests/unit/test_guardrails.py tests/integration/test_plan_api.py tests/integration/test_weekly_job.py`.
+  - Ejecutar `uv run pytest tests/unit/test_structure.py tests/unit/test_summaries.py tests/unit/test_guardrails.py tests/integration/test_plan_api.py tests/integration/test_weekly_job.py tests/unit/test_sc001.py tests/integration/test_sc001_delivered.py`.
 
 **Checkpoint**: US1 a US3 funcionan. Se genera un plan seguro a demanda y los lunes.
 
@@ -351,7 +363,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 - [ ] T051 [P] [US4] Escribir `tests/integration/test_daily_flow.py`, sembrando un plan con `save_plan`, con `send_time` 06:00 y `FakeWeather` sin alertas:
   - `tick` a las 05:59 no hace nada. `tick` a las 06:00 envía la pregunta de fatiga exacta y crea un `daily_dispatch` `awaiting_fatigue` (AC-47).
   - `handle_text(chat_id, "abc")` vuelve a preguntar sin enviar el mensaje, y `asked_at` no cambia (AC-75).
-  - `handle_text(chat_id, "9")` envía el mensaje ajustado y el estado pasa a `sent`.
+  - `handle_text(chat_id, "9")` envía el mensaje ajustado, devuelve `None`, `FakeNotifier` registra exactamente un envío a ese chat y el estado pasa a `sent`.
   - Sin respuesta, un `tick` a las 08:00 envía el mensaje sin ajuste, y una respuesta tardía se ignora.
   - Si `FakeWriter` lanza `AIUnavailableError` o tarda más de 5 s, se envía la plantilla y se registra `external_error`/`llm_call` (AC-79).
   - Si `FakeWriter` devuelve un texto inválido, se envía la plantilla (AC-78).
@@ -375,10 +387,10 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - `users_due_for_dispatch(conn, today, now_min)`: usuarios con un vínculo, `send_time_min <= now_min`, una sesión `today` sin resultado registrado y sin un `daily_dispatch` para `today` (FR-029).
   - `create_dispatch`, `get_open_dispatch_by_chat(conn, chat_id, today)`, `set_dispatch_sent(conn, id, fatigue, used_template, delivered, now)` y `expired_dispatches(conn, cutoff_iso)`.
 - [ ] T055 [US4] Implementar `app/services/daily_service.py`:
-  - `async start_dispatches(conn, clock, notifier, weather)`: para cada usuario debido, crea un dispatch `awaiting_fatigue` con `asked_at=now` y envía `FATIGUE_QUESTION`. El hook de clima queda preparado con `weather=None`, que significa sin evaluación, y se completa en US5.
-  - `async handle_fatigue_reply(conn, clock, notifier, writer, chat_id, text) -> str|None`: si no hay un dispatch abierto o pasaron 2 h desde `asked_at`, devuelve `None`. Si el texto no es un entero de 1 a 10, devuelve `FATIGUE_RETRY`. Si es válido, compone y envía el mensaje.
+  - `async start_dispatches(conn, clock, notifier, weather)`: para cada usuario debido, crea un dispatch `awaiting_fatigue` con `asked_at=now`, emite `audit.event("tool_call", tool="db", op="create_dispatch")` y envía `FATIGUE_QUESTION`. El hook de clima queda preparado con `weather=None`, que significa sin evaluación, y se completa en US5.
+  - `async handle_fatigue_reply(conn, clock, notifier, writer, chat_id, text) -> str|None`: si no hay un dispatch abierto o pasaron 2 h desde `asked_at`, devuelve `None`. Si el texto no es un entero de 1 a 10, devuelve `FATIGUE_RETRY`. Si es válido, llama a `compose_and_send`, que envía el mensaje por el `notifier`, y devuelve `None`. Solo devuelve texto (`FATIGUE_RETRY`) cuando el adaptador tiene que responder.
   - `async expire_waits(conn, clock, notifier, writer)`: envía sin ajuste los dispatches con `asked_at <= now-2h`.
-  - `async compose_and_send(...)`: llama a `build_message_data`, intenta `asyncio.wait_for(writer(data), 5)` con `validate_draft` y, si falla o se pasa del tiempo (se trata como `AIUnavailableError("timeout")`), usa `render_template`; después llama a `notifier.send_message` y a `set_dispatch_sent` con `delivered` igual al booleano devuelto, y emite `audit.event("message_sent", template=…, user_id=…, delivered=…)`. No hay reintentos. El ajuste por fatiga no modifica la sesión guardada (FR-030).
+  - `async compose_and_send(...)`: llama a `build_message_data`, intenta `asyncio.wait_for(writer(data), 5)` con `validate_draft` y, si falla o se pasa del tiempo (se trata como `AIUnavailableError("timeout")`), usa `render_template`; después llama a `notifier.send_message` y a `set_dispatch_sent` con `delivered` igual al booleano devuelto, emite `audit.event("tool_call", tool="db", op="set_dispatch_sent")`, y emite `audit.event("message_sent", template=…, user_id=…, delivered=…)`. No hay reintentos. El ajuste por fatiga no modifica la sesión guardada (FR-030).
 - [ ] T056 [US4] Agregar a `app/bot/handlers.py` el núcleo `async handle_text(conn, clock, notifier, writer, chat_id, text) -> str|None`, que delega en `handle_fatigue_reply`, y su adaptador `MessageHandler(filters.TEXT & ~filters.COMMAND)`, que responde solo si el resultado no es `None`.
 - [ ] T057 [US4] Extender `scheduler.tick` en `app/scheduler.py` para que, después de `run_monday`, llame a `daily_service.start_dispatches` y a `daily_service.expire_waits`. Ejecutar `uv run pytest tests/unit/test_daily_message.py tests/integration/test_daily_flow.py`.
 
@@ -426,7 +438,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - En `start_dispatches`, antes de preguntar la fatiga, llamar a `weather.fetch_forecast(profile.city)`, que usa la ciudad vigente (AC-71).
     - Si falla, registrar `audit.event("external_error", service="openweather", reason=…)` y guardar `weather_json={"available": false}`.
     - Si responde, llamar a `assess` y emitir `audit.event("weather_decision", unfavorable, extreme, alternative, postpone)`.
-    - Si `postpone`, ejecutar `set_session_postponed` y emitir `audit.event("tool_call", tool="db", op="set_session_postponed")` y `audit.event("session_postponed", …)`, enviar `postponement_message(reason, count)`, crear el dispatch `postponed_sent` con `delivered` igual al booleano que devuelve el envío y no preguntar la fatiga (FR-038).
+    - Si `postpone`, ejecutar `set_session_postponed` y emitir `audit.event("tool_call", tool="db", op="set_session_postponed")` y `audit.event("session_postponed", …)`, enviar `postponement_message(reason, count)`, crear el dispatch `postponed_sent` con `delivered` igual al booleano que devuelve el envío (con `audit.event("tool_call", tool="db", op="create_dispatch")`) y no preguntar la fatiga (FR-038).
     - Si no se pospone, guardar `weather_json` en el dispatch y preguntar la fatiga.
   - En `compose_and_send`, reconstruir el `WeatherAssessment` desde `weather_json` y pasarlo a `build_message_data`.
   - En `users_due_for_dispatch`, filtrar las sesiones con `system_status` no nulo.
@@ -522,8 +534,8 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 - [ ] T077 [US8] Agregar a `app/services/repository.py` las funciones `update_password_hash(conn, user_id, hash)` y `delete_user(conn, user_id)`. Esta última es un `DELETE FROM users WHERE id=?` que borra todo en cascada; verificar que `PRAGMA foreign_keys=ON` está activo en la conexión.
 - [ ] T078 [US8] Agregar a `app/services/accounts.py` las funciones:
-  - `create_reset_code(conn, user_id, clock) -> str`: 10 caracteres y vence en 30 min.
-  - `reset_password(conn, code, new_password, clock)`: dentro de `transaction`, ejecuta `consume_code(purpose="reset")` y `update_password_hash`, y lanza `InvalidResetCode` si el código no es válido.
+  - `create_reset_code(conn, user_id, clock) -> str`: 10 caracteres y vence en 30 min. Emite `audit.event("tool_call", tool="db", op="create_reset_code")` sin el código.
+  - `reset_password(conn, code, new_password, clock)`: dentro de `transaction`, ejecuta `consume_code(purpose="reset")` y `update_password_hash`, y lanza `InvalidResetCode` si el código no es válido. Emite `audit.event("tool_call", tool="db", op="reset_password", outcome=…)` sin el código.
   - `delete_account(conn, user_id)`, que emite `audit.event("tool_call", tool="db", op="delete_account")`.
 - [ ] T079 [US8] Implementar `POST /auth/password-reset` en `app/api/auth.py`. El body es `{code: str, new_password: str}`, con `new_password` de 8 a 128 caracteres; la validación de pydantic va antes de consumir el código. Responde 200 con `{"detail": "Contraseña actualizada"}` o 400 con `{"detail": "Código inválido o vencido"}`.
 - [ ] T080 [US8] Implementar `DELETE /profile` en `app/api/profile.py`, con `confirm: str | None = Query(None)`. Si `confirm != "true"`, responde 400 con la advertencia exacta del contrato. Si es `"true"`, llama a `delete_account` y devuelve `Response(status_code=204)`. No debe enviar el header `X-Session-Token`: borrarlo de la respuesta en este endpoint.
@@ -540,14 +552,14 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 - [ ] T082 [P] Escribir `tests/contract/test_api_contract.py`. Para cada endpoint de `contracts/api.md`, verificar el código de estado y las claves exactas del cuerpo de éxito (`Profile`, `Plan`, `HistoryItem`, `{access_token, token_type, expires_at}`, `{code, expires_at, instructions}`), los `detail` literales de los mensajes fijos y la presencia de `X-Session-Token` en las respuestas autenticadas (salvo en el 204 de DELETE).
 - [ ] T083 [P] Escribir `tests/unit/test_audit.py` con `caplog` sobre `runia.audit`:
   - `redact` oculta `password`, `access_token`, `api_key`, `code` y `Authorization`, también anidados.
-  - Recorrer los flujos de `POST /plan` (con un recorte), el dispatch diario (con una falla de clima y una posposición) y el registro con reclasificación, y verificar que se emiten `llm_call`, `tool_call` (con `tool="db"` y `op` `save_plan`, `register_result` y `set_session_postponed`), `guardrail` (con `before` y `after`), `session_postponed`, `external_error` y `weather_decision` (FR-045).
+  - Recorrer los flujos de `POST /plan` (con un recorte), el dispatch diario (con una falla de clima y una posposición) y el registro con reclasificación, y verificar que se emiten `llm_call`, `tool_call` (con `tool="db"` y cada `op` de la lista cerrada de R-18; para eso recorrer también registro, login, edición del perfil, vinculación, reseteo de contraseña, fallback del lunes y borrado de cuenta), `guardrail` (con `before` y `after`), `session_postponed`, `external_error` y `weather_decision` (FR-045).
   - Ninguna línea de log de **ningún** logger (todos los registros de `caplog`, no solo `runia.audit`) contiene la contraseña, el JWT, `TELEGRAM_BOT_TOKEN` ni `OPENWEATHER_API_KEY` usados en el test (SC-008). Incluye un flujo de clima con el cliente real de `app/integrations/openweather.py` sobre un transporte httpx mockeado, con `caplog.set_level(logging.DEBUG)` después de `configure_logging()`.
 - [ ] T084 [P] Escribir `tests/unit/test_constitution.py`:
   - Recorrer `app/**/*.py` y verificar que `google.genai` o `from google import genai` solo aparecen en `app/ai/gemini.py` (principio I).
   - Verificar que `app/domain/*.py` no importa `app.services`, `app.ai`, `app.integrations` ni `app.db`.
   - Verificar que los archivos versionados (`git ls-files`) no contienen patrones de credenciales (`AIza[0-9A-Za-z_-]{20,}` y `\d{8,10}:[A-Za-z0-9_-]{35}`) y que `.env` está ignorado (principio II, SC-009).
-  - Verificar que `PLAN_SYSTEM_PROMPT` y `MESSAGE_SYSTEM_PROMPT` de `app/ai/prompts.py` contienen la prohibición de consejo médico y de lesiones, y que `build_plan_prompt` y `build_message_prompt` no incluyen email ni chat_id (FR-033, FR-028).
-- [ ] T085 [P] Escribir `tests/integration/test_performance.py` (SC-004, RNF-01). Con 10 usuarios en `awaiting_fatigue`, un `FakeWriter` con 1 s de latencia y un `FakeNotifier` con 0,2 s, lanzar 10 llamadas a `handle_fatigue_reply` con `asyncio.gather` y verificar que el p95 de las duraciones es de 10 s o menos. Agregar un caso con un `FakeWriter` que tarda 6 s: el timeout de 5 s activa la plantilla y el total queda por debajo de 10 s.
+  - Verificar que `PLAN_SYSTEM_PROMPT` y `MESSAGE_SYSTEM_PROMPT` de `app/ai/prompts.py` contienen la prohibición de consejo médico y de lesiones, que `PLAN_SYSTEM_PROMPT` pide la entrada en calor y la vuelta a la calma como bloques explícitos (FR-019), y que `build_plan_prompt` y `build_message_prompt` no incluyen email ni chat_id (FR-033, FR-028).
+- [ ] T085 [P] Escribir `tests/integration/test_performance.py` (SC-004, RNF-01). Con 10 usuarios en `awaiting_fatigue`, un `FakeWriter` con 1 s de latencia y un `FakeNotifier` con 0,2 s, lanzar 10 llamadas a `handle_fatigue_reply` con `asyncio.gather` y verificar que el p95 de las duraciones es de 10 s o menos. Agregar un caso con un `FakeWriter` que tarda 6 s: el timeout de 5 s activa la plantilla y el total queda por debajo de 10 s. Agregar un caso que verifique `build_application("123:dummy", state).concurrent_updates > 1` (no usa red: `build()` no llama a Telegram).
 - [ ] T086 Actualizar `AGENTS.md` en la sección "Cómo correr": agregar `RUNIA_DB_PATH`, que es opcional y no es un secreto (por defecto `runia.db`), y los comandos del bot (`/vincular`, `/registrar`, `/restablecer`). No modificar el resto del archivo.
 - [ ] T087 Ejecutar `uv run pytest` completo y corregir los fallos. Después, seguir `specs/001-runia-training-plans/quickstart.md`, pasos 1 a 3 (tests, verificación de secretos y arranque con y sin `TELEGRAM_BOT_TOKEN`), y registrar en el PR cualquier desvío que se encuentre.
 
@@ -592,7 +604,7 @@ Setup → Foundational → US1 → US2 ─┬─→ US3 ─┬─→ US4 → US5
 
 - **Foundational**: T004, T005, T006, T007, T008, T010, T011 y T012 en paralelo. T009 y T013 a T016 van en secuencia (T013 depende de T009; T015 depende de T009, T011 y T013; T016 depende de T015).
 - **US1**: T018, T019 y T020 en paralelo.
-- **US3**: los tests T032 a T036 en paralelo. T038, T039 y T043 en paralelo entre sí. T040, T041 y T042 en secuencia (mismo archivo).
+- **US3**: los tests T032 a T036 y T088 en paralelo. T038, T039 y T043 en paralelo entre sí. T040, T041 y T042 en secuencia (mismo archivo).
 - **US5**: T058, T059, T060 y T061 en paralelo.
 - **US6**: T065, T066 y T067 en paralelo.
 - Después de US3, **US6, US7 y US4** pueden avanzar en paralelo con personas distintas, salvo las funciones que agregan a `repository.py`, `api/plan.py`, `api/sessions.py` y `bot/handlers.py`, que van en secuencia o coordinadas.
@@ -609,6 +621,7 @@ Task: "T033 tests/unit/test_summaries.py"
 Task: "T034 tests/unit/test_guardrails.py"
 Task: "T035 tests/integration/test_plan_api.py"
 Task: "T036 tests/integration/test_weekly_job.py"
+Task: "T088 tests/sc001_check.py + tests/unit/test_sc001.py + tests/integration/test_sc001_delivered.py"
 
 # Módulos puros en paralelo:
 Task: "T038 app/domain/structure.py"
@@ -650,7 +663,7 @@ El MVP **de producto**, el que da valor al corredor, es US1 a US4, las cuatro P1
 1. Setup + Foundational: la base está lista.
 2. US1: cuentas y perfil. Validar.
 3. US2: vínculo con Telegram. Validar `/vincular` contra un bot real.
-4. US3: planes con guardarraíles. Validar SC-001 con `test_guardrails.py`.
+4. US3: planes con guardarraíles. Validar SC-001 con el verificador de T088 (`test_sc001.py` y `test_sc001_delivered.py`).
 5. US4: mensaje diario. Con esto queda el MVP de producto.
 6. US5: clima. US6: registro, que activa la descarga y la calidad de novatos con datos reales.
 7. US7: cronograma e historial. US8: administración de la cuenta.
@@ -659,6 +672,6 @@ El MVP **de producto**, el que da valor al corredor, es US1 a US4, las cuatro P1
 ### Notas
 
 - [P] significa archivos distintos y sin dependencias pendientes.
-- Cada checkpoint de historia termina con `uv run pytest` en verde (constitución). Las tareas de tests no se cierran por separado.
+- Cada checkpoint de historia termina con `uv run pytest` en verde (constitución). Ninguna tarea de la fase se marca `[x]` antes de ese checkpoint; al pasar, se marcan todas juntas.
 - No agregar endpoints, comandos ni dependencias que no estén en `contracts/` o en R-01 (principio III).
 - Quedan fuera de esta iteración RF-20/AC-54 (cambio de nivel restringido) y AC-25/AC-26 (confirmación y reprogramación por clima).

@@ -1,6 +1,6 @@
 # Implementation Plan: Runia — Planes de entrenamiento para running
 
-**Branch**: `master` (sin rama dedicada) | **Date**: 2026-10-15 | **Spec**: [spec.md](./spec.md)
+**Branch**: `main` (sin rama dedicada) | **Date**: 2026-10-15 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `specs/001-runia-training-plans/spec.md` (fuente: `PRD.md`, PRD-001)
 
@@ -52,7 +52,7 @@ JWT de 2 h renovable hasta 7 días desde el login; Argon2id con m=19456, t=2, p=
 logs JSON sin secretos.
 
 **Scale/Scope**: decenas de usuarios (el objetivo de rendimiento se mide con 10 simultáneos), 8 historias de usuario,
-46 requerimientos funcionales, alrededor de 10 endpoints y 5 comandos del bot.
+46 requerimientos funcionales, alrededor de 10 endpoints, 4 comandos del bot y un handler de texto.
 
 ## Constitution Check
 
