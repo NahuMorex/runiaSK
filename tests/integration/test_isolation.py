@@ -4,16 +4,12 @@ import pytest
 
 from app.bot.handlers import handle_registrar
 from app.domain.models import Block, PlannedSession
-from app.main import app as _default_app
 from tests.helpers import DEFAULT_PASSWORD, seed_plan, seed_result, seed_user, session_ids
 
 WEEK = date(2026, 10, 12)
 THU = date(2026, 10, 15)
 CHAT_A, CHAT_B = 101, 202
 A_EMAIL, B_EMAIL = "ana@example.com", "beto@example.com"
-
-HAS_US7 = {"/schedule", "/history"} <= {getattr(r, "path", None) for r in _default_app.routes}
-needs_us7 = pytest.mark.skipif(not HAS_US7, reason="GET /schedule y /history llegan con US7")
 
 
 def login(client, email) -> dict:
@@ -109,7 +105,6 @@ def test_profile_returns_only_own_data(client, conn):
     assert_no_a_data(r.text, a_ids)
 
 
-@needs_us7
 def test_schedule_returns_only_own_plan(client, conn):
     _, _, a_ids, b_ids = seed_two(conn)
     r = client.get("/schedule", headers=login(client, B_EMAIL))
@@ -118,7 +113,6 @@ def test_schedule_returns_only_own_plan(client, conn):
     assert_no_a_data(r.text, a_ids)
 
 
-@needs_us7
 def test_history_returns_only_own_sessions(client, conn):
     _, _, a_ids, _ = seed_two(conn)
     r = client.get("/history", headers=login(client, B_EMAIL))
