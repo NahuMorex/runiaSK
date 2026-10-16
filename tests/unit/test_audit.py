@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from telegram.error import InvalidToken
+from telegram.error import InvalidToken, TimedOut
 
 from app import audit, main, scheduler
 from app.ai import gemini
@@ -20,6 +20,7 @@ from app.clock import FixedClock
 from app.domain.models import Block, PlannedSession
 from app.integrations import openweather
 from app.main import create_app
+from app.services.notifier import TelegramNotifier
 from tests.conftest import FAKE_GOOGLE_API_KEY, FAKE_OPENWEATHER_API_KEY
 from tests.helpers import DEFAULT_PASSWORD, FakeNotifier, ba, easy_session, seed_plan, seed_user
 
@@ -152,6 +153,30 @@ def test_startup_with_bot_logs_bot_and_scheduler(db_path, monkeypatch, caplog):
     startups = [ev for ev in _events(caplog) if ev["type"] == "startup"]
     assert any(ev.get("bot") is True for ev in startups)
     assert any(ev.get("scheduler") is True for ev in startups)
+
+
+class FakeBot:
+    def __init__(self, error: Exception | None = None):
+        self.error = error
+        self.sent = []
+
+    async def send_message(self, *, chat_id, text):
+        if self.error is not None:
+            raise self.error
+        self.sent.append((chat_id, text))
+
+
+@pytest.mark.anyio
+async def test_telegram_notifier_only_audits_failures(caplog):
+    caplog.set_level(logging.INFO, logger="runia.audit")
+
+    assert await TelegramNotifier(FakeBot()).send_message(1, "hola") is True
+    assert _events(caplog) == []
+
+    assert await TelegramNotifier(FakeBot(TimedOut())).send_message(1, "hola") is False
+    assert [(ev["type"], ev["service"], ev["reason"]) for ev in _events(caplog)] == [
+        ("external_error", "telegram", "TimedOut")
+    ]
 
 
 # --- Dobles: cliente de google-genai y transporte de OpenWeatherMap -----------

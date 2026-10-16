@@ -17,10 +17,10 @@ class TelegramNotifier:
         self._bot = bot
 
     async def send_message(self, chat_id: int, text: str) -> bool:
+        """Solo audita las fallas: `message_sent` lo emite el flujo diario, con plantilla o modelo (R-18)."""
         try:
             await self._bot.send_message(chat_id=chat_id, text=text)
         except TelegramError as exc:
             audit.event("external_error", service="telegram", reason=type(exc).__name__)
             return False
-        audit.event("message_sent", ok=True)
         return True
