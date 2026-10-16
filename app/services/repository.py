@@ -71,6 +71,17 @@ def update_profile(conn: sqlite3.Connection, user_id: int, fields: dict, now) ->
     )
 
 
+def update_password_hash(conn: sqlite3.Connection, user_id: int, password_hash: str) -> None:
+    conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
+
+
+def delete_user(conn: sqlite3.Connection, user_id: int) -> None:
+    """Borra el usuario; el resto de sus filas cae por ON DELETE CASCADE (RF-19)."""
+    if conn.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+        raise RuntimeError("PRAGMA foreign_keys está desactivado: el borrado no sería en cascada")
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+
 def get_chat_id(conn: sqlite3.Connection, user_id: int) -> int | None:
     row = conn.execute("SELECT chat_id FROM telegram_links WHERE user_id = ?", (user_id,)).fetchone()
     return row["chat_id"] if row else None
