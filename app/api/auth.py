@@ -39,3 +39,18 @@ def login(body: LoginBody, conn: sqlite3.Connection = Depends(get_conn), clock: 
     except accounts.InvalidCredentialsError:
         raise HTTPException(401, "Credenciales inválidas") from None
     return {"access_token": token, "token_type": "bearer", "expires_at": expires_at.isoformat()}
+
+
+class PasswordResetBody(BaseModel):
+    code: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/password-reset")
+def password_reset(body: PasswordResetBody, conn: sqlite3.Connection = Depends(get_conn), clock: Clock = Depends(get_clock)):
+    """El cuerpo se valida antes de tocar el código: una contraseña inválida no lo consume (AC-50)."""
+    try:
+        accounts.reset_password(conn, body.code, body.new_password, clock)
+    except accounts.InvalidResetCode:
+        raise HTTPException(400, "Código inválido o vencido") from None
+    return {"detail": "Contraseña actualizada"}
