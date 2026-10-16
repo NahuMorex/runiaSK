@@ -319,14 +319,51 @@ def users_due_for_dispatch(conn: sqlite3.Connection, today: date, now_min: int) 
     ).fetchall()
 
 
-def create_dispatch(conn: sqlite3.Connection, user_id: int, session_id: int, day: date, asked_at) -> int | None:
-    """Crea el dispatch `awaiting_fatigue`; devuelve None si ya había uno para ese día."""
+def create_dispatch(
+    conn: sqlite3.Connection,
+    user_id: int,
+    session_id: int,
+    day: date,
+    now,
+    *,
+    state: str = "awaiting_fatigue",
+    delivered: bool | None = None,
+) -> int | None:
+    """Crea el dispatch del día; devuelve None si ya había uno.
+
+    `awaiting_fatigue` guarda `now` como hora de la pregunta; `postponed_sent` (FR-038), como hora de envío.
+    """
+    asked_at, sent_at = (_iso(now), None) if state == "awaiting_fatigue" else (None, _iso(now))
     row = conn.execute(
-        "INSERT INTO daily_dispatches (user_id, session_id, date, state, asked_at) "
-        "VALUES (?, ?, ?, 'awaiting_fatigue', ?) ON CONFLICT (user_id, date) DO NOTHING RETURNING id",
-        (user_id, session_id, _iso(day), _iso(asked_at)),
+        "INSERT INTO daily_dispatches (user_id, session_id, date, state, asked_at, sent_at, delivered) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (user_id, date) DO NOTHING RETURNING id",
+        (user_id, session_id, _iso(day), state, asked_at, sent_at, None if delivered is None else int(delivered)),
     ).fetchone()
     return row["id"] if row else None
+
+
+def set_dispatch_weather(conn: sqlite3.Connection, dispatch_id: int, weather_json: dict) -> None:
+    conn.execute(
+        "UPDATE daily_dispatches SET weather_json = ? WHERE id = ?",
+        (json.dumps(weather_json, ensure_ascii=False, sort_keys=True), dispatch_id),
+    )
+
+
+def set_session_postponed(conn: sqlite3.Connection, session_id: int, reason: str) -> None:
+    """NULL → postponed_weather es terminal (FR-037)."""
+    conn.execute(
+        "UPDATE sessions SET system_status = 'postponed_weather', postponed_reason = ? "
+        "WHERE id = ? AND system_status IS NULL",
+        (reason, session_id),
+    )
+
+
+def count_postponed_in_week(conn: sqlite3.Connection, user_id: int, week_start: date) -> int:
+    return conn.execute(
+        "SELECT COUNT(*) AS n FROM sessions s JOIN plans p ON p.id = s.plan_id "
+        "WHERE s.user_id = ? AND p.week_start = ? AND s.system_status = 'postponed_weather'",
+        (user_id, _iso(week_start)),
+    ).fetchone()["n"]
 
 
 def get_open_dispatch_by_chat(conn: sqlite3.Connection, chat_id: int, today: date):
