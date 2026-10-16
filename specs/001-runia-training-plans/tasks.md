@@ -37,9 +37,9 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 **Purpose**: Inicializar el proyecto uv y el esqueleto de paquetes.
 
-- [ ] T001 Crear `pyproject.toml` (proyecto `runia`, `requires-python = "==3.12.*"`). Dependencias: `fastapi`, `uvicorn`, `google-genai`, `python-telegram-bot`, `argon2-cffi`, `pyjwt`, `httpx`, `email-validator`, `tzdata`. Grupo `dev`: `pytest`. Agregar `[tool.pytest.ini_options]` con `testpaths = ["tests"]` y `pythonpath = ["."]`. Crear `.python-version` con `3.12`. Ambos archivos van en la raíz del repo.
-- [ ] T002 Crear el esqueleto de paquetes con `__init__.py` vacíos: `app/__init__.py`, `app/api/__init__.py`, `app/domain/__init__.py`, `app/services/__init__.py`, `app/ai/__init__.py`, `app/integrations/__init__.py`, `app/bot/__init__.py`. Crear también los directorios `tests/unit/`, `tests/integration/` y `tests/contract/`, sin `__init__.py`.
-- [ ] T003 Ejecutar `uv sync` para generar `uv.lock` y `.venv/`. Verificar con `uv run python -c "import sys; print(sys.version)"` que la versión es 3.12, y confirmar que `.gitignore` ya ignora `.env`, `*.db` y `.venv/`.
+- [X] T001 Crear `pyproject.toml` (proyecto `runia`, `requires-python = "==3.12.*"`). Dependencias: `fastapi`, `uvicorn`, `google-genai`, `python-telegram-bot`, `argon2-cffi`, `pyjwt`, `httpx`, `email-validator`, `tzdata`. Grupo `dev`: `pytest`. Agregar `[tool.pytest.ini_options]` con `testpaths = ["tests"]` y `pythonpath = ["."]`. Crear `.python-version` con `3.12`. Ambos archivos van en la raíz del repo.
+- [X] T002 Crear el esqueleto de paquetes con `__init__.py` vacíos: `app/__init__.py`, `app/api/__init__.py`, `app/domain/__init__.py`, `app/services/__init__.py`, `app/ai/__init__.py`, `app/integrations/__init__.py`, `app/bot/__init__.py`. Crear también los directorios `tests/unit/`, `tests/integration/` y `tests/contract/`, sin `__init__.py`.
+- [X] T003 Ejecutar `uv sync` para generar `uv.lock` y `.venv/`. Verificar con `uv run python -c "import sys; print(sys.version)"` que la versión es 3.12, y confirmar que `.gitignore` ya ignora `.env`, `*.db` y `.venv/`.
 
 ---
 

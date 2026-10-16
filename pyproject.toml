@@ -1,0 +1,28 @@
+[project]
+name = "runia"
+version = "0.1.0"
+description = "API y bot de Telegram que arma planes semanales de entrenamiento para running"
+requires-python = "==3.12.*"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "google-genai",
+    "python-telegram-bot",
+    "argon2-cffi",
+    "pyjwt",
+    "httpx",
+    "email-validator",
+    "tzdata",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
