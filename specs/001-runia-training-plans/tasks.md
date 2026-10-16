@@ -554,7 +554,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - `redact` oculta `password`, `access_token`, `api_key`, `code` y `Authorization`, también anidados.
   - Recorrer los flujos de `POST /plan` (con un recorte), el dispatch diario (con una falla de clima y una posposición) y el registro con reclasificación, y verificar que se emiten `llm_call`, `tool_call` (con `tool="db"` y cada `op` de la lista cerrada de R-18; para eso recorrer también registro, login, edición del perfil, vinculación, reseteo de contraseña, fallback del lunes y borrado de cuenta), `guardrail` (con `before` y `after`), `session_postponed`, `external_error` y `weather_decision` (FR-045).
   - Ninguna línea de log de **ningún** logger (todos los registros de `caplog`, no solo `runia.audit`) contiene la contraseña, el JWT, `TELEGRAM_BOT_TOKEN` ni `OPENWEATHER_API_KEY` usados en el test (SC-008). Incluye un flujo de clima con el cliente real de `app/integrations/openweather.py` sobre un transporte httpx mockeado, con `caplog.set_level(logging.DEBUG)` después de `configure_logging()`.
-- [ ] T084 [P] Escribir `tests/unit/test_constitution.py`:
+- [X] T084 [P] Escribir `tests/unit/test_constitution.py`:
   - Recorrer `app/**/*.py` y verificar que `google.genai` o `from google import genai` solo aparecen en `app/ai/gemini.py` (principio I).
   - Verificar que `app/domain/*.py` no importa `app.services`, `app.ai`, `app.integrations` ni `app.db`.
   - Verificar que los archivos versionados (`git ls-files`) no contienen patrones de credenciales (`AIza[0-9A-Za-z_-]{20,}` y `\d{8,10}:[A-Za-z0-9_-]{35}`) y que `.env` está ignorado (principio II, SC-009).
