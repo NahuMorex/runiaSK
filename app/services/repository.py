@@ -288,3 +288,77 @@ def record_weekly_run(conn: sqlite3.Connection, user_id: int, week_start: date, 
         (user_id, _iso(week_start), outcome, _iso(now)),
     )
     return cur.rowcount == 1
+
+
+# --- Envío diario -------------------------------------------------------------
+
+
+def get_session_for_user_on(conn: sqlite3.Connection, user_id: int, day: date) -> dict | None:
+    row = conn.execute(
+        "SELECT s.*, r.status AS result_status, r.rpe AS result_rpe, r.notes AS result_notes "
+        "FROM sessions s LEFT JOIN session_results r ON r.session_id = s.id "
+        "WHERE s.user_id = ? AND s.date = ?",
+        (user_id, _iso(day)),
+    ).fetchone()
+    if row is None:
+        return None
+    return _session_dict(row, get_session_blocks(conn, row["id"]))
+
+
+def users_due_for_dispatch(conn: sqlite3.Connection, today: date, now_min: int) -> list:
+    """Usuarios vinculados cuya hora de envío ya llegó, con sesión hoy sin resultado y sin dispatch (FR-029)."""
+    return conn.execute(
+        "SELECT l.user_id, l.chat_id, s.id AS session_id FROM telegram_links l "
+        "JOIN profiles p ON p.user_id = l.user_id "
+        "JOIN sessions s ON s.user_id = l.user_id AND s.date = ? "
+        "LEFT JOIN session_results r ON r.session_id = s.id "
+        "LEFT JOIN daily_dispatches d ON d.user_id = l.user_id AND d.date = ? "
+        "WHERE p.send_time_min IS NOT NULL AND p.send_time_min <= ? AND r.session_id IS NULL AND d.id IS NULL "
+        "ORDER BY l.user_id",
+        (_iso(today), _iso(today), now_min),
+    ).fetchall()
+
+
+def create_dispatch(conn: sqlite3.Connection, user_id: int, session_id: int, day: date, asked_at) -> int | None:
+    """Crea el dispatch `awaiting_fatigue`; devuelve None si ya había uno para ese día."""
+    row = conn.execute(
+        "INSERT INTO daily_dispatches (user_id, session_id, date, state, asked_at) "
+        "VALUES (?, ?, ?, 'awaiting_fatigue', ?) ON CONFLICT (user_id, date) DO NOTHING RETURNING id",
+        (user_id, session_id, _iso(day), _iso(asked_at)),
+    ).fetchone()
+    return row["id"] if row else None
+
+
+def get_open_dispatch_by_chat(conn: sqlite3.Connection, chat_id: int, today: date):
+    return conn.execute(
+        "SELECT d.* FROM daily_dispatches d JOIN telegram_links l ON l.user_id = d.user_id "
+        "WHERE l.chat_id = ? AND d.date = ? AND d.state = 'awaiting_fatigue'",
+        (chat_id, _iso(today)),
+    ).fetchone()
+
+
+def claim_dispatch(conn: sqlite3.Connection, dispatch_id: int, fatigue: int | None) -> bool:
+    """Pasa el dispatch a `sent` antes de redactar el mensaje, para que una respuesta concurrente
+    o el cierre de la espera no lo envíen dos veces. Devuelve False si otro ya lo tomó."""
+    cur = conn.execute(
+        "UPDATE daily_dispatches SET state = 'sent', fatigue = ? WHERE id = ? AND state = 'awaiting_fatigue'",
+        (fatigue, dispatch_id),
+    )
+    return cur.rowcount == 1
+
+
+def set_dispatch_sent(
+    conn: sqlite3.Connection, dispatch_id: int, fatigue: int | None, used_template: bool, delivered: bool, now
+) -> None:
+    conn.execute(
+        "UPDATE daily_dispatches SET state = 'sent', fatigue = ?, used_template = ?, delivered = ?, sent_at = ? "
+        "WHERE id = ?",
+        (fatigue, int(used_template), int(delivered), _iso(now), dispatch_id),
+    )
+
+
+def expired_dispatches(conn: sqlite3.Connection, cutoff_iso: str) -> list:
+    return conn.execute(
+        "SELECT * FROM daily_dispatches WHERE state = 'awaiting_fatigue' AND asked_at <= ? ORDER BY id",
+        (cutoff_iso,),
+    ).fetchall()

@@ -355,12 +355,12 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T050 [P] [US4] Escribir `tests/unit/test_daily_message.py`:
+- [X] T050 [P] [US4] Escribir `tests/unit/test_daily_message.py`:
   - `render_template` siempre da ≤ 150 palabras e incluye el tipo, el rango y, según la sesión, el ritmo y la secuencia (AC-27, AC-28).
   - Con fatiga ≥ 8 y una sesión de calidad, el tipo es "suave/recuperación" y queda un solo bloque de trote sin ritmo (AC-48).
   - Con fatiga ≥ 8 y una sesión suave, se conservan los bloques y aparece "La sesión se mantiene suave por la fatiga." (AC-80).
   - `validate_draft` rechaza, en un caso cada uno: texto vacío, 151 palabras, falta del rango, falta del ritmo, un número ajeno ("12 km"), "¿", "?", `**`, `# `, `- ` al inicio de línea y `[x](y)` (AC-78). Acepta un texto válido que reordena los datos.
-- [ ] T051 [P] [US4] Escribir `tests/integration/test_daily_flow.py`, sembrando un plan con `save_plan`, con `send_time` 06:00 y `FakeWeather` sin alertas:
+- [X] T051 [P] [US4] Escribir `tests/integration/test_daily_flow.py`, sembrando un plan con `save_plan`, con `send_time` 06:00 y `FakeWeather` sin alertas:
   - `tick` a las 05:59 no hace nada. `tick` a las 06:00 envía la pregunta de fatiga exacta y crea un `daily_dispatch` `awaiting_fatigue` (AC-47).
   - `handle_text(chat_id, "abc")` vuelve a preguntar sin enviar el mensaje, y `asked_at` no cambia (AC-75).
   - `handle_text(chat_id, "9")` envía el mensaje ajustado, devuelve `None`, `FakeNotifier` registra exactamente un envío a ese chat y el estado pasa a `sent`.
@@ -373,7 +373,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Implementation for User Story 4
 
-- [ ] T052 [US4] Implementar `app/domain/daily_message.py`:
+- [X] T052 [US4] Implementar `app/domain/daily_message.py`:
   - `apply_fatigue(blocks, title, fatigue) -> (blocks, type_label, title, kept_easy: bool)`: con fatiga ≥ 8, una sesión de calidad pasa por `to_easy` y queda con el tipo "suave/recuperación" y el título `EASY_TITLE`; una suave conserva sus bloques y devuelve `kept_easy=True`.
   - `render_sequence(blocks) -> str`, con el formato de `contracts/telegram-bot.md` (`"trote 1,00 km a 5:45 min/km (5:45), recuperación 2:00; caminata 0,50 km"`).
   - `build_message_data(session, profile, fatigue, weather: WeatherAssessment|None, weather_unavailable: bool) -> DailyMessageData` (importado de `app.domain.models`, nunca de `app.ai`). El rango sugerido es el rango preferido (R-17). Los campos de clima quedan en `None` hasta US5.
@@ -381,18 +381,18 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
   - `required_fragments(data) -> list[str]` y `allowed_numbers(data) -> set[str]`, que toman los números de `render_template(data)` normalizados (coma/punto, `m:ss`).
   - `validate_draft(text, data) -> bool`, con las 6 reglas de R-17.
   - Las constantes `FATIGUE_QUESTION` y `FATIGUE_RETRY`, con los textos del contrato.
-- [ ] T053 [US4] Agregar a `app/ai/prompts.py` las constantes `MESSAGE_SYSTEM_PROMPT` (con las reglas de "Mensaje diario" de `contracts/ai-module.md`, incluida la prohibición explícita de dar consejo médico o de lesiones, FR-033) y `build_message_prompt(data: DailyMessageData)`. En `app/ai/gemini.py`, implementar `async draft_daily_message(data) -> str` con un timeout de 5 s y el mismo mapeo de errores y `audit.event("llm_call", operation="daily_message", …)` que en T044, y exportarla en `app/ai/__init__.py`. En `create_app`, inyectarla como `writer` por defecto; si se usa, el `lifespan` llama a `config.google_api_key()` al arrancar (principio II).
-- [ ] T054 [US4] Agregar a `app/services/repository.py`:
+- [X] T053 [US4] Agregar a `app/ai/prompts.py` las constantes `MESSAGE_SYSTEM_PROMPT` (con las reglas de "Mensaje diario" de `contracts/ai-module.md`, incluida la prohibición explícita de dar consejo médico o de lesiones, FR-033) y `build_message_prompt(data: DailyMessageData)`. En `app/ai/gemini.py`, implementar `async draft_daily_message(data) -> str` con un timeout de 5 s y el mismo mapeo de errores y `audit.event("llm_call", operation="daily_message", …)` que en T044, y exportarla en `app/ai/__init__.py`. En `create_app`, inyectarla como `writer` por defecto; si se usa, el `lifespan` llama a `config.google_api_key()` al arrancar (principio II).
+- [X] T054 [US4] Agregar a `app/services/repository.py`:
   - `get_session_for_user_on(conn, user_id, date)`, que devuelve la sesión con sus bloques.
   - `users_due_for_dispatch(conn, today, now_min)`: usuarios con un vínculo, `send_time_min <= now_min`, una sesión `today` sin resultado registrado y sin un `daily_dispatch` para `today` (FR-029).
   - `create_dispatch`, `get_open_dispatch_by_chat(conn, chat_id, today)`, `set_dispatch_sent(conn, id, fatigue, used_template, delivered, now)` y `expired_dispatches(conn, cutoff_iso)`.
-- [ ] T055 [US4] Implementar `app/services/daily_service.py`:
+- [X] T055 [US4] Implementar `app/services/daily_service.py`:
   - `async start_dispatches(conn, clock, notifier, weather)`: para cada usuario debido, crea un dispatch `awaiting_fatigue` con `asked_at=now`, emite `audit.event("tool_call", tool="db", op="create_dispatch")` y envía `FATIGUE_QUESTION`. El hook de clima queda preparado con `weather=None`, que significa sin evaluación, y se completa en US5.
   - `async handle_fatigue_reply(conn, clock, notifier, writer, chat_id, text) -> str|None`: si no hay un dispatch abierto o pasaron 2 h desde `asked_at`, devuelve `None`. Si el texto no es un entero de 1 a 10, devuelve `FATIGUE_RETRY`. Si es válido, llama a `compose_and_send`, que envía el mensaje por el `notifier`, y devuelve `None`. Solo devuelve texto (`FATIGUE_RETRY`) cuando el adaptador tiene que responder.
   - `async expire_waits(conn, clock, notifier, writer)`: envía sin ajuste los dispatches con `asked_at <= now-2h`.
   - `async compose_and_send(...)`: llama a `build_message_data`, intenta `asyncio.wait_for(writer(data), 5)` con `validate_draft` y, si falla o se pasa del tiempo (se trata como `AIUnavailableError("timeout")`), usa `render_template`; después llama a `notifier.send_message` y a `set_dispatch_sent` con `delivered` igual al booleano devuelto, emite `audit.event("tool_call", tool="db", op="set_dispatch_sent")`, y emite `audit.event("message_sent", template=…, user_id=…, delivered=…)`. No hay reintentos. El ajuste por fatiga no modifica la sesión guardada (FR-030).
-- [ ] T056 [US4] Agregar a `app/bot/handlers.py` el núcleo `async handle_text(conn, clock, notifier, writer, chat_id, text) -> str|None`, que delega en `handle_fatigue_reply`, y su adaptador `MessageHandler(filters.TEXT & ~filters.COMMAND)`, que responde solo si el resultado no es `None`.
-- [ ] T057 [US4] Extender `scheduler.tick` en `app/scheduler.py` para que, después de `run_monday`, llame a `daily_service.start_dispatches` y a `daily_service.expire_waits`. Ejecutar `uv run pytest tests/unit/test_daily_message.py tests/integration/test_daily_flow.py`.
+- [X] T056 [US4] Agregar a `app/bot/handlers.py` el núcleo `async handle_text(conn, clock, notifier, writer, chat_id, text) -> str|None`, que delega en `handle_fatigue_reply`, y su adaptador `MessageHandler(filters.TEXT & ~filters.COMMAND)`, que responde solo si el resultado no es `None`.
+- [X] T057 [US4] Extender `scheduler.tick` en `app/scheduler.py` para que, después de `run_monday`, llame a `daily_service.start_dispatches` y a `daily_service.expire_waits`. Ejecutar `uv run pytest tests/unit/test_daily_message.py tests/integration/test_daily_flow.py`.
 
 **Checkpoint**: las 4 historias P1 (US1 a US4) están completas. Este es el MVP del producto.
 

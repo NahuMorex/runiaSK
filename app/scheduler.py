@@ -5,7 +5,7 @@ from datetime import datetime
 
 from app import audit, db
 from app.clock import FixedClock
-from app.services import weekly_job
+from app.services import daily_service, weekly_job
 
 TICK_SECONDS = 60
 
@@ -15,6 +15,8 @@ async def tick(state, now: datetime) -> None:
     conn = db.connect(state.db_path)
     try:
         await weekly_job.run_monday(conn, clock, state.planner, state.notifier)
+        await daily_service.start_dispatches(conn, clock, state.notifier, state.weather)
+        await daily_service.expire_waits(conn, clock, state.notifier, state.writer)
     finally:
         conn.close()
 

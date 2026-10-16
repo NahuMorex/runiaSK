@@ -77,7 +77,7 @@ def _history(conn, uid, n_weeks, *, start=date(2026, 10, 19), volume=1200):
 async def test_monday_plan(conn, db_path, weeks_before):
     uid = seed_user(conn, "a@example.com", chat_id=11, frequency=3)
     _history(conn, uid, weeks_before)
-    st = SimpleNamespace(db_path=db_path, planner=FakePlanner(proposal=adverse_proposal), notifier=FakeNotifier())
+    st = SimpleNamespace(db_path=db_path, planner=FakePlanner(proposal=adverse_proposal), notifier=FakeNotifier(), writer=None, weather=None)
     await scheduler.tick(st, ba(2026, 10, 19, 0, 1))
     plan_id = repository.get_plan_for_week(conn, uid, date(2026, 10, 19))["id"]
     plan, _ = assert_sc001(conn, uid, plan_id)
@@ -98,7 +98,7 @@ async def test_fallback_plan(conn, db_path):
     ])
     seed_result(conn, session_ids(conn, last)[0], uid)
     conn.execute("INSERT INTO pending_reclassifications (user_id, remaining) VALUES (?, 1)", (uid,))
-    st = SimpleNamespace(db_path=db_path, planner=FakePlanner(error=AIUnavailableError("timeout")), notifier=FakeNotifier())
+    st = SimpleNamespace(db_path=db_path, planner=FakePlanner(error=AIUnavailableError("timeout")), notifier=FakeNotifier(), writer=None, weather=None)
     await scheduler.tick(st, ba(2026, 10, 19, 0, 1))
     plan_row = repository.get_plan_for_week(conn, uid, date(2026, 10, 19))
     assert plan_row["source"] == "fallback"

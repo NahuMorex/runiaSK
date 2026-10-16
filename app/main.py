@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 
 from app import audit, config, db, scheduler
-from app.ai import propose_week_plan
+from app.ai import draft_daily_message, propose_week_plan
 from app.api import auth, plan, profile, telegram_link
 from app.bot.handlers import build_application
 from app.clock import SystemClock
@@ -73,9 +73,9 @@ def create_app(
     app = FastAPI(title="Runia", lifespan=lifespan)
     app.state.db_path = db_path or config.db_path()
     app.state.clock = clock or SystemClock()
-    app.state.uses_default_ai = planner is None
+    app.state.uses_default_ai = planner is None or writer is None
     app.state.planner = planner or propose_week_plan
-    app.state.writer = writer
+    app.state.writer = writer or draft_daily_message
     app.state.weather = weather
     app.state.notifier = notifier
 
