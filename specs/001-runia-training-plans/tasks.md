@@ -522,7 +522,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Tests for User Story 8 ⚠️
 
-- [ ] T076 [P] [US8] Escribir `tests/integration/test_account_admin.py`:
+- [X] T076 [P] [US8] Escribir `tests/integration/test_account_admin.py`:
   - `handle_restablecer` desde un chat vinculado devuelve un texto con un código de 10 caracteres. `POST /auth/password-reset` con ese código y una contraseña nueva da 200, el login con la contraseña nueva da 200 y con la vieja da 401 (AC-49).
   - Reusar el código da 400. Un código con 30 min 1 s da 400 y uno inexistente también, sin cambiar el hash. Con una contraseña de 7 caracteres da 422 y el código sigue sin consumirse (AC-50).
   - `/restablecer` desde un chat no vinculado devuelve el texto del contrato.
@@ -532,14 +532,14 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Implementation for User Story 8
 
-- [ ] T077 [US8] Agregar a `app/services/repository.py` las funciones `update_password_hash(conn, user_id, hash)` y `delete_user(conn, user_id)`. Esta última es un `DELETE FROM users WHERE id=?` que borra todo en cascada; verificar que `PRAGMA foreign_keys=ON` está activo en la conexión.
-- [ ] T078 [US8] Agregar a `app/services/accounts.py` las funciones:
+- [X] T077 [US8] Agregar a `app/services/repository.py` las funciones `update_password_hash(conn, user_id, hash)` y `delete_user(conn, user_id)`. Esta última es un `DELETE FROM users WHERE id=?` que borra todo en cascada; verificar que `PRAGMA foreign_keys=ON` está activo en la conexión.
+- [X] T078 [US8] Agregar a `app/services/accounts.py` las funciones:
   - `create_reset_code(conn, user_id, clock) -> str`: 10 caracteres y vence en 30 min. Emite `audit.event("tool_call", tool="db", op="create_reset_code")` sin el código.
   - `reset_password(conn, code, new_password, clock)`: dentro de `transaction`, ejecuta `consume_code(purpose="reset")` y `update_password_hash`, y lanza `InvalidResetCode` si el código no es válido. Emite `audit.event("tool_call", tool="db", op="reset_password", outcome=…)` sin el código.
   - `delete_account(conn, user_id)`, que emite `audit.event("tool_call", tool="db", op="delete_account")`.
-- [ ] T079 [US8] Implementar `POST /auth/password-reset` en `app/api/auth.py`. El body es `{code: str, new_password: str}`, con `new_password` de 8 a 128 caracteres; la validación de pydantic va antes de consumir el código. Responde 200 con `{"detail": "Contraseña actualizada"}` o 400 con `{"detail": "Código inválido o vencido"}`.
-- [ ] T080 [US8] Implementar `DELETE /profile` en `app/api/profile.py`, con `confirm: str | None = Query(None)`. Si `confirm != "true"`, responde 400 con la advertencia exacta del contrato. Si es `"true"`, llama a `delete_account` y devuelve `Response(status_code=204)`. No debe enviar el header `X-Session-Token`: borrarlo de la respuesta en este endpoint.
-- [ ] T081 [US8] Agregar a `app/bot/handlers.py` el núcleo `async handle_restablecer(conn, clock, chat_id) -> str` y su `CommandHandler("restablecer")`, con los textos del contrato. Ejecutar `uv run pytest tests/integration/test_account_admin.py`.
+- [X] T079 [US8] Implementar `POST /auth/password-reset` en `app/api/auth.py`. El body es `{code: str, new_password: str}`, con `new_password` de 8 a 128 caracteres; la validación de pydantic va antes de consumir el código. Responde 200 con `{"detail": "Contraseña actualizada"}` o 400 con `{"detail": "Código inválido o vencido"}`.
+- [X] T080 [US8] Implementar `DELETE /profile` en `app/api/profile.py`, con `confirm: str | None = Query(None)`. Si `confirm != "true"`, responde 400 con la advertencia exacta del contrato. Si es `"true"`, llama a `delete_account` y devuelve `Response(status_code=204)`. No debe enviar el header `X-Session-Token`: borrarlo de la respuesta en este endpoint.
+- [X] T081 [US8] Agregar a `app/bot/handlers.py` el núcleo `async handle_restablecer(conn, clock, chat_id) -> str` y su `CommandHandler("restablecer")`, con los textos del contrato. Ejecutar `uv run pytest tests/integration/test_account_admin.py`.
 
 **Checkpoint**: las 8 historias funcionan.
 
