@@ -6,4 +6,5 @@ __pycache__/
 *.db
 *.db-journal
 .env.*
+!.env.example
 .claude/settings.local.json
