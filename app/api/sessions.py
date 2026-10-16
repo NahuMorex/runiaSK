@@ -1,4 +1,4 @@
-"""POST /sessions/{session_id}/result."""
+"""POST /sessions/{session_id}/result y GET /history."""
 
 import sqlite3
 from typing import Literal
@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.clock import Clock
 from app.deps import get_clock, get_conn, get_current_user
-from app.services import results
+from app.services import plan_service, repository, results
 
 router = APIRouter()
 
@@ -51,3 +51,15 @@ def post_result(
     except tuple(ERRORS) as exc:
         code, detail = ERRORS[type(exc)]
         raise HTTPException(code, detail) from None
+
+
+@router.get("/history")
+def get_history(
+    user_id: int = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_conn),
+    clock: Clock = Depends(get_clock),
+):
+    today = clock.now().date()
+    return {
+        "sessions": [plan_service.serialize_history_item(s, today) for s in repository.history_sessions(conn, user_id, today)]
+    }

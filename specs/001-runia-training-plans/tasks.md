@@ -498,7 +498,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Tests for User Story 7 ⚠️
 
-- [ ] T072 [P] [US7] Escribir `tests/integration/test_schedule_history.py`. Usar un plan de lunes a domingo, con hoy jueves:
+- [X] T072 [P] [US7] Escribir `tests/integration/test_schedule_history.py`. Usar un plan de lunes a domingo, con hoy jueves:
   - En `GET /schedule`: la sesión del lunes, registrada, aparece "Completada" con RPE y notas; la del martes, sin registro, "Sin registrar"; la del miércoles, pospuesta, "Pospuesta por clima"; la de hoy, "Hoy"; y la del sábado, "Proyectada" (AC-35).
   - Sin un plan para la semana, `GET /schedule` da 404 con el mensaje exacto.
   - `GET /history` incluye las sesiones de semanas anteriores y las pasadas, más la de hoy solo si ya tiene un registro, ordenadas por fecha descendente y con `rpe` y `notes` en `null` cuando no existen (AC-36, AC-29).
@@ -506,9 +506,9 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Implementation for User Story 7
 
-- [ ] T073 [US7] Agregar a `app/services/repository.py` las funciones `sessions_with_results_for_week(conn, user_id, week_start)` y `history_sessions(conn, user_id, today)`. La segunda devuelve las sesiones con `date < today` o con un resultado, unidas a `session_results` con `LEFT JOIN`, ordenadas por `date DESC`.
-- [ ] T074 [US7] Agregar a `app/services/plan_service.py` la función `serialize_history_item(row, today) -> dict` con la forma `HistoryItem` del contrato, que reutiliza `status_label` (T046).
-- [ ] T075 [US7] Implementar `GET /schedule` en `app/api/plan.py` (200 con `serialize_plan` más `result` por sesión, o 404 con "No tenés un plan para la semana en curso") y `GET /history` en `app/api/sessions.py` (200 con `{"sessions": [...]}`). Ambos dependen de `get_current_user`. Ejecutar `uv run pytest tests/integration/test_schedule_history.py tests/integration/test_isolation.py`.
+- [X] T073 [US7] Agregar a `app/services/repository.py` las funciones `sessions_with_results_for_week(conn, user_id, week_start)` y `history_sessions(conn, user_id, today)`. La segunda devuelve las sesiones con `date < today` o con un resultado, unidas a `session_results` con `LEFT JOIN`, ordenadas por `date DESC`.
+- [X] T074 [US7] Agregar a `app/services/plan_service.py` la función `serialize_history_item(row, today) -> dict` con la forma `HistoryItem` del contrato, que reutiliza `status_label` (T046).
+- [X] T075 [US7] Implementar `GET /schedule` en `app/api/plan.py` (200 con `serialize_plan` más `result` por sesión, o 404 con "No tenés un plan para la semana en curso") y `GET /history` en `app/api/sessions.py` (200 con `{"sessions": [...]}`). Ambos dependen de `get_current_user`. Ejecutar `uv run pytest tests/integration/test_schedule_history.py tests/integration/test_isolation.py`.
 
 **Checkpoint**: US7 funciona.
 

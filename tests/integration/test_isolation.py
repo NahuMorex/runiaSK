@@ -39,11 +39,10 @@ def results_of(conn, user_id):
     return [dict(r) for r in conn.execute("SELECT * FROM session_results WHERE user_id = ? ORDER BY session_id", (user_id,))]
 
 
-def assert_no_a_data(text: str, a_ids):
+def assert_no_a_data(text: str):
+    """Sin textos de A. Los ids de sesión se comparan en cada test, porque un id de plan puede coincidir con uno de A."""
     for leak in ("Ana", "ana@example.com", "Rosario", "nota privada"):
         assert leak not in text
-    for sid in a_ids:
-        assert f'"id":{sid},' not in text.replace(" ", "") and f'"session_id":{sid},' not in text.replace(" ", "")
 
 
 # --- POST /sessions/{id}/result (AC-37) --------------------------------------
@@ -91,7 +90,7 @@ async def test_bot_without_session_today_does_not_touch_others(conn, clock):
     before = results_of(conn, a)
     text = await handle_registrar(conn, clock, CHAT_B, ["completada", "4"])
     assert text == "No tenés una sesión planificada para hoy."
-    assert_no_a_data(text, a_ids)
+    assert_no_a_data(text)
     assert results_of(conn, a) == before and results_of(conn, b) == []
 
 
@@ -102,7 +101,7 @@ def test_profile_returns_only_own_data(client, conn):
     _, _, a_ids, _ = seed_two(conn)
     r = client.get("/profile", headers=login(client, B_EMAIL))
     assert r.status_code == 200 and r.json()["city"] == "Mendoza"
-    assert_no_a_data(r.text, a_ids)
+    assert_no_a_data(r.text)
 
 
 def test_schedule_returns_only_own_plan(client, conn):
@@ -110,11 +109,11 @@ def test_schedule_returns_only_own_plan(client, conn):
     r = client.get("/schedule", headers=login(client, B_EMAIL))
     assert r.status_code == 200
     assert [s["id"] for s in r.json()["sessions"]] == b_ids
-    assert_no_a_data(r.text, a_ids)
+    assert_no_a_data(r.text)
 
 
 def test_history_returns_only_own_sessions(client, conn):
     _, _, a_ids, _ = seed_two(conn)
     r = client.get("/history", headers=login(client, B_EMAIL))
     assert r.status_code == 200 and r.json() == {"sessions": []}
-    assert_no_a_data(r.text, a_ids)
+    assert_no_a_data(r.text)

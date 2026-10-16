@@ -463,14 +463,6 @@ def upsert_pending_reclass(conn: sqlite3.Connection, user_id: int, remaining: in
 # --- Cronograma e historial (R-19) -------------------------------------------
 
 
-def sessions_with_results_for_week(conn: sqlite3.Connection, user_id: int, week_start: date) -> list[dict] | None:
-    """Sesiones del plan de la semana, con bloques y resultado; None si no hay plan."""
-    plan = get_plan_for_week(conn, user_id, week_start)
-    if plan is None:
-        return None
-    return get_plan_sessions(conn, plan["id"])
-
-
 def history_sessions(conn: sqlite3.Connection, user_id: int, today: date) -> list[dict]:
     """Sesiones con fecha anterior a hoy, más las que ya tienen resultado, por fecha descendente."""
     rows = conn.execute(
