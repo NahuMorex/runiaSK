@@ -2,7 +2,7 @@
 
 import re
 
-from app.domain import units
+from app.domain import units, weather_rules, weeks
 from app.domain.models import (
     EASY_TITLE,
     Block,
@@ -64,16 +64,22 @@ def build_message_data(
 ) -> DailyMessageData:
     """Datos ya decididos del mensaje. El rango sugerido es el rango preferido completo (R-17).
 
-    Los campos de clima quedan en None hasta US5.
+    `weather` es la evaluación a la hora de envío (None si no hay); `weather_unavailable`, si el servicio falló.
     """
     blocks, label, title, kept_easy = apply_fatigue(session["blocks"], session["title"], fatigue)
     pace = next((b.target_pace_s for b in blocks if b.kind == "run" and b.target_pace_s is not None), None)
+    alert = weather is not None and weather.unfavorable
+    alt = weather.alternative_date if alert else None
     return DailyMessageData(
         session_type_label=label,
         title=title,
         suggested_range=f"{units.format_hhmm(profile['range_start_min'])}–{units.format_hhmm(profile['range_end_min'])}",
         target_pace=f"{units.format_pace(pace)} min/km" if pace is not None else None,
         sequence=render_sequence(blocks) if blocks else None,
+        weather_alert=f"Alerta climática: {' y '.join(weather.reasons)}." if alert else None,
+        alternative_day=weeks.weekday_es(alt) if alt is not None else None,
+        no_alternative_text=weather_rules.NO_ALTERNATIVE_TEXT if alert and alt is None else None,
+        weather_unavailable_text=weather_rules.WEATHER_UNAVAILABLE_TEXT if weather_unavailable else None,
         fatigue_kept_easy_text=FATIGUE_KEPT_EASY if kept_easy else None,
     )
 
@@ -84,6 +90,15 @@ def _lines(data: DailyMessageData, sequence: str | None) -> list[str]:
         lines.append(f"Secuencia: {sequence}.")
     if data.target_pace:
         lines.append(f"Ritmo objetivo: {data.target_pace}.")
+    if data.weather_alert:
+        line = data.weather_alert
+        if data.alternative_day:
+            line += f" Día alternativo: {data.alternative_day}."
+        elif data.no_alternative_text:
+            line += f" {data.no_alternative_text}."
+        lines.append(line)
+    if data.weather_unavailable_text:
+        lines.append(data.weather_unavailable_text)
     if data.fatigue_kept_easy_text:
         lines.append(data.fatigue_kept_easy_text)
     return lines
@@ -113,6 +128,10 @@ def required_fragments(data: DailyMessageData) -> list[str]:
         data.suggested_range,
         data.target_pace,
         _fitted_sequence(data),
+        data.weather_alert,
+        data.alternative_day,
+        data.no_alternative_text,
+        data.weather_unavailable_text,
         data.fatigue_kept_easy_text,
     ]
     return [f for f in fragments if f]
@@ -129,6 +148,7 @@ def _numbers(text: str) -> set[str]:
 
 
 def allowed_numbers(data: DailyMessageData) -> set[str]:
+    """Los números de la plantilla, que incluye todos los campos (también los de clima)."""
     return _numbers(render_template(data))
 
 

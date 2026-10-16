@@ -9,6 +9,7 @@ from app import audit, config, db, scheduler
 from app.ai import draft_daily_message, propose_week_plan
 from app.api import auth, plan, profile, telegram_link
 from app.bot.handlers import build_application
+from app.integrations import openweather
 from app.clock import SystemClock
 from app.services.notifier import TelegramNotifier
 
@@ -46,6 +47,8 @@ def create_app(
         config.jwt_secret()  # sin JWT_SECRET la app no arranca (principio II)
         if app.state.uses_default_ai:
             config.google_api_key()
+        if app.state.uses_default_weather:
+            config.openweather_api_key()
         conn = db.connect(app.state.db_path)
         try:
             db.init_db(conn)
@@ -76,7 +79,8 @@ def create_app(
     app.state.uses_default_ai = planner is None or writer is None
     app.state.planner = planner or propose_week_plan
     app.state.writer = writer or draft_daily_message
-    app.state.weather = weather
+    app.state.uses_default_weather = weather is None
+    app.state.weather = weather or openweather
     app.state.notifier = notifier
 
     app.include_router(auth.router)

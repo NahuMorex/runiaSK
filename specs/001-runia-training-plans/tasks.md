@@ -406,13 +406,13 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T058 [P] [US5] Escribir `tests/unit/test_weather_rules.py`:
+- [X] T058 [P] [US5] Escribir `tests/unit/test_weather_rules.py`:
   - `day_conditions`: toma el máximo de los intervalos de 3 h que se solapan con el rango; un intervalo 06:00–09:00 se solapa con un rango 08:00–10:00 y uno 10:00–13:00 no.
   - Umbrales con valores justo en el límite y apenas por encima: pop 60/61, temperatura 32/32,1, temperatura 38/38,1 y pop 80/81; además, tormenta con id 211.
   - La alternativa es el primer día de los 3 siguientes sin condición desfavorable, nunca después del domingo; un día sin datos de pronóstico no puede ser alternativa.
   - Se pospone si la condición es extrema y no hay alternativa; si es extrema pero hay alternativa, solo se alerta.
   - Texto de los motivos según el contrato (`"lluvia probable (70%)"`, `"calor extremo (35 °C)"`, `"tormenta eléctrica"`, unidos con " y ").
-- [ ] T059 [P] [US5] Escribir `tests/integration/test_weather_flow.py`:
+- [X] T059 [P] [US5] Escribir `tests/integration/test_weather_flow.py`:
   - Con lluvia de 70%, el mensaje incluye la alerta y el día alternativo, la pregunta de fatiga se sigue enviando y la sesión no cambia de estado (AC-23, AC-24, FR-036).
   - Sin alternativa, el mensaje dice "No hay una alternativa disponible esta semana" y la sesión sigue ejecutable (AC-64).
   - Con una condición extrema sin alternativa, `system_status='postponed_weather'`, se envía un único mensaje de posposición de ≤ 150 palabras, no se pregunta la fatiga y el dispatch queda `postponed_sent` (AC-40, AC-68).
@@ -422,19 +422,19 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
 
 ### Implementation for User Story 5
 
-- [ ] T060 [P] [US5] Implementar `app/integrations/openweather.py`:
+- [X] T060 [P] [US5] Implementar `app/integrations/openweather.py`:
   - `@dataclass Slot(start: datetime, pop_pct: int, temp_c: float, thunderstorm: bool)`, `@dataclass Forecast(slots: list[Slot])` y `class WeatherUnavailableError(Exception)` con `reason`.
   - `async fetch_forecast(city: str) -> Forecast`: usa `httpx.AsyncClient(timeout=5)` para `GET https://api.openweathermap.org/data/2.5/forecast` con `params={"q": f"{city},AR", "units": "metric", "appid": config.openweather_api_key()}`. Convierte `dt` (UTC) a la TZ de Buenos Aires, `pop*100` a entero y marca `thunderstorm` si algún `weather.id` está entre 200 y 232.
   - Timeout, 429, 5xx, 404, error de red y JSON inválido se traducen a `WeatherUnavailableError(reason)`.
   - Emitir `audit.event("tool_call", tool="weather", city=…, outcome=…)`. La `appid` nunca se registra.
-- [ ] T061 [P] [US5] Implementar `app/domain/weather_rules.py` (R-04, FR-035, FR-037):
+- [X] T061 [P] [US5] Implementar `app/domain/weather_rules.py` (R-04, FR-035, FR-037):
   - `day_conditions(forecast_slots, day, range_start_min, range_end_min) -> DayConditions|None` (`max_pop`, `max_temp`, `thunder`), que devuelve `None` si no hay intervalos que se solapen con el rango.
   - `is_unfavorable(c)`: pop > 60 o temperatura > 32. `is_extreme(c)`: temperatura > 38, tormenta o pop > 80.
   - `reasons_text(c) -> str`.
   - `assess(forecast_slots, session_date, range_start_min, range_end_min) -> WeatherAssessment`, que busca la alternativa en `session_date+1..min(+3, domingo)`.
   - Las constantes `NO_ALTERNATIVE_TEXT = "No hay una alternativa disponible esta semana"` y `WEATHER_UNAVAILABLE_TEXT = "Clima no disponible: seguí las pautas base de ritmo e hidratación."`, y `postponement_message(reason, count_week) -> str`, con el texto del contrato.
-- [ ] T062 [US5] Agregar a `app/services/repository.py` las funciones `set_session_postponed(conn, session_id, reason)`, `count_postponed_in_week(conn, user_id, week_start)`, `set_dispatch_weather(conn, dispatch_id, weather_json)` y `create_dispatch(..., state="postponed_sent")`, esta última aceptando el estado y `delivered` como parámetros.
-- [ ] T063 [US5] Extender `app/services/daily_service.py`:
+- [X] T062 [US5] Agregar a `app/services/repository.py` las funciones `set_session_postponed(conn, session_id, reason)`, `count_postponed_in_week(conn, user_id, week_start)`, `set_dispatch_weather(conn, dispatch_id, weather_json)` y `create_dispatch(..., state="postponed_sent")`, esta última aceptando el estado y `delivered` como parámetros.
+- [X] T063 [US5] Extender `app/services/daily_service.py`:
   - En `start_dispatches`, antes de preguntar la fatiga, llamar a `weather.fetch_forecast(profile.city)`, que usa la ciudad vigente (AC-71).
     - Si falla, registrar `audit.event("external_error", service="openweather", reason=…)` y guardar `weather_json={"available": false}`.
     - Si responde, llamar a `assess` y emitir `audit.event("weather_decision", unfavorable, extreme, alternative, postpone)`.
@@ -442,7 +442,7 @@ lógica de negocio se pueda testear sin llamadas reales al modelo ni a servicios
     - Si no se pospone, guardar `weather_json` en el dispatch y preguntar la fatiga.
   - En `compose_and_send`, reconstruir el `WeatherAssessment` desde `weather_json` y pasarlo a `build_message_data`.
   - En `users_due_for_dispatch`, filtrar las sesiones con `system_status` no nulo.
-- [ ] T064 [US5] Completar los campos de clima de `build_message_data` en `app/domain/daily_message.py`: `weather_alert = "Alerta climática: {motivos}."`, `alternative_day = weekday_es(alt)` (en `render_template` se escribe como `"Día alternativo: {día}."`), `no_alternative_text` y `weather_unavailable_text`. Agregar estos campos a `required_fragments` y `allowed_numbers`. Inyectar `app.integrations.openweather` como `weather` por defecto en `create_app` de `app/main.py`; si se usa, el `lifespan` llama a `config.openweather_api_key()` al arrancar (principio II). Ejecutar `uv run pytest tests/unit/test_weather_rules.py tests/integration/test_weather_flow.py tests/integration/test_daily_flow.py`.
+- [X] T064 [US5] Completar los campos de clima de `build_message_data` en `app/domain/daily_message.py`: `weather_alert = "Alerta climática: {motivos}."`, `alternative_day = weekday_es(alt)` (en `render_template` se escribe como `"Día alternativo: {día}."`), `no_alternative_text` y `weather_unavailable_text`. Agregar estos campos a `required_fragments` y `allowed_numbers`. Inyectar `app.integrations.openweather` como `weather` por defecto en `create_app` de `app/main.py`; si se usa, el `lifespan` llama a `config.openweather_api_key()` al arrancar (principio II). Ejecutar `uv run pytest tests/unit/test_weather_rules.py tests/integration/test_weather_flow.py tests/integration/test_daily_flow.py`.
 
 **Checkpoint**: US5 funciona sobre el flujo diario de US4.
 

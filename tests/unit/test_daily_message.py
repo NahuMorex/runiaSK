@@ -177,3 +177,38 @@ def test_kept_easy_text_is_required():
     text = dm.render_template(data)
     assert dm.validate_draft(text, data)
     assert not dm.validate_draft(text.replace("La sesión se mantiene suave por la fatiga.", ""), data)
+
+
+# --- Clima (US5) -------------------------------------------------------------
+
+
+def weather_data(weather=None, unavailable=False):
+    return dm.build_message_data(session([Block("run", 400)], "Rodaje"), PROFILE, None, weather, unavailable)
+
+
+def test_weather_alert_with_alternative_in_template_and_required():
+    from app.domain.models import WeatherAssessment
+
+    w = WeatherAssessment(True, True, False, ["lluvia probable (70%)"], date(2026, 10, 16), False)
+    data = weather_data(w)
+    assert data.weather_alert == "Alerta climática: lluvia probable (70%)." and data.alternative_day == "viernes"
+    assert data.no_alternative_text is None and data.weather_unavailable_text is None
+    assert "Alerta climática: lluvia probable (70%). Día alternativo: viernes." in dm.render_template(data)
+    assert {"Alerta climática: lluvia probable (70%).", "viernes"} <= set(dm.required_fragments(data))
+    assert "70" in dm.allowed_numbers(data)
+    draft = "Hoy: suave, Rodaje, de 07:00–09:00. Secuencia: trote 4,00 km. Alerta climática: lluvia probable (70%)."
+    assert not dm.validate_draft(draft, data)
+    assert dm.validate_draft(draft + " Si preferís, el viernes también sirve.", data)
+
+
+def test_weather_alert_without_alternative_and_unavailable_texts():
+    from app.domain.models import WeatherAssessment
+
+    data = weather_data(WeatherAssessment(True, True, False, ["calor extremo (34 °C)"], None, False))
+    assert data.no_alternative_text == "No hay una alternativa disponible esta semana"
+    assert "Alerta climática: calor extremo (34 °C). No hay una alternativa disponible esta semana." in dm.render_template(data)
+
+    data = weather_data(None, unavailable=True)
+    assert data.weather_alert is None
+    assert dm.render_template(data).endswith("Clima no disponible: seguí las pautas base de ritmo e hidratación.")
+    assert data.weather_unavailable_text in dm.required_fragments(data)
